@@ -1,5 +1,5 @@
 Create table dbo.Parcelas (
-	IdParcela int identity(1,1) constraint PkParcelas primary key,
+	IdParcela int constraint PkParcelas primary key,
 	IdTitulo int,
 	IdOrigem tinyint,
 	NumeroParcela smallint,
