@@ -2,7 +2,6 @@ Create table dbo.Parcelas (
 	IdParcela int identity(1,1) constraint PkParcelas primary key,
 	IdTitulo int,
 	IdOrigem tinyint,
-	Sequencia varchar(6),
 	NumeroParcela smallint,
 	Tipo char(1),
 	IdSituacaoParcela char(1),
