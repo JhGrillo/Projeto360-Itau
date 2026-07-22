@@ -1,0 +1,22 @@
+Create table dbo.Parcelas (
+	IdParcela int identity(1,1) constraint PkParcelas primary key,
+	IdTitulo int,
+	IdOrigem tinyint,
+	Sequencia varchar(6),
+	NumeroParcela smallint,
+	Tipo char(1),
+	IdSituacaoParcela char(1),
+	ValorPrincipal money,
+	DataVencimento datetime,
+	DataPrevisaoDevolucao datetime,
+	DataDevolucao datetime,
+	IdMotivoDevolucao char(2),
+	DataInclusao datetime,
+	IdUsuarioInclusao int,
+	DataAtualizacao datetime,
+	IdUsuarioAtualizacao int,
+	DataExclusao datetime,
+	IdUsuarioExclusao int,
+	ValidoDe datetime,
+	ValidoAte datetime
+);
