@@ -1,8 +1,11 @@
-Create table misitau.log.ControleExecucoes (
-	IdExecucao int identity(1,1) constraint PKControleExecucoes primary key,
-	NomeProcedure varchar(128),
-	DataHoraInicio datetime,
-	DataHoraFim datetime,
-	TempoExecucaoSegundos decimal,
-	StatusExecucao varchar(20)
+Create table misitau.log.ControleVolumes (
+	IdControleVolume int identity(1,1) constraint PK_ControleVolumes primary key,
+	IdExecucao int,
+	NomeTabelaOrigem varchar(128),
+	NomeTabelaDestino varchar(128),
+	LinhasOrigem int,
+	LinhasInseridas int,
+	LinhasAtualizadas int,
+	LinhasTotaisDestino int,
+	DataExecucao datetime
 )
