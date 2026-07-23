@@ -1,0 +1,1 @@
+Create nonclustered index IxParcelasInformacoesComplementaresIdParcela on dbo.ParcelasInformacoesComplementares (IdParcela);
