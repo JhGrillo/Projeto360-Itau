@@ -1,4 +1,4 @@
-Create table dbo.Devedores (
+Create table misitau.dbo.Devedores (
 	IdDevedor int constraint PkDevedores primary key,
 	IdOrigem tinyint,
 	CnpjCpf char(14),
