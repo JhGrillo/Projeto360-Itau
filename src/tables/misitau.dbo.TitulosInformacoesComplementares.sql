@@ -1,5 +1,5 @@
 CREATE TABLE misitau.dbo.TitulosInformacoesComplementares (
-    IdTituloInformacaoComplementar int constraint PkTitulos primary key clustered,
+    IdTituloInformacaoComplementar int constraint PkTitulosInformacoesComplementares primary key clustered,
     DataInclusao datetime,
     IdUsuarioInclusao int,
     DataAtualizacao datetime,
