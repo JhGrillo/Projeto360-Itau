@@ -1,0 +1,2 @@
+Create nonclustered index IxTitulosInformacoeComplementaresIdTitulo
+on misitau.dbo.TitulosInformacoesComplementares (IdTitulo);
