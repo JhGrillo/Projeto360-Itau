@@ -65,7 +65,6 @@ Create table #Titulos (
     IdUsuarioAtualizacao int,
     DataExclusao datetime,
     IdUsuarioExclusao int,
-    Suspenso char(1),
     ValidoDe datetime,
     ValidoAte datetime
 );
@@ -103,7 +102,6 @@ Insert into #Titulos (
                     IdUsuarioAtualizacao,
                     DataExclusao,
                     IdUsuarioExclusao,
-                    Suspenso,
                     ValidoDe,
                     ValidoAte
                     )
@@ -166,7 +164,6 @@ Insert into misitau.dbo.Titulos (
                         IdUsuarioAtualizacao,
                         DataExclusao,
                         IdUsuarioExclusao,
-                        Suspenso,
                         ValidoDe,
                         ValidoAte
                         )
@@ -186,7 +183,6 @@ Select distinct
     IdUsuarioAtualizacao,
     DataExclusao,
     IdUsuarioExclusao,
-    Suspenso,
     ValidoDe,
     ValidoAte
 From #Titulos a With(nolock)
@@ -211,8 +207,7 @@ Set a.IdCarteira = b.IdCarteira,
     a.DataAtualizacao = b.DataAtualizacao,
     a.IdUsuarioAtualizacao = b.IdUsuarioAtualizacao,
     a.DataExclusao = b.DataExclusao,
-    a.IdUsuarioExclusao = b.IdUsuarioExclusao,
-    a.Suspenso = b.Suspenso
+    a.IdUsuarioExclusao = b.IdUsuarioExclusao
 From misitau.dbo.Titulos a With(nolock)
 Inner join #Titulos b With(nolock) on a.IdTitulo = b.IdTitulo
 Where
