@@ -68,7 +68,7 @@ Select
     CodigoReferencia
 From misitau.glo.Produtos
 Where
-    IdProduto > isnull(@IdProduto, 0)
+    IdProduto > isnull(@IdProduto, 0);
 
 Set @LinhasOrigem = @@RowCount;
 
