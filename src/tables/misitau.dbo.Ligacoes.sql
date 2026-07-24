@@ -1,0 +1,21 @@
+Create table misitau.dbo.Ligacoes (
+	IdLigacao int constraint PkLigacao primary key,
+	Chave varchar(256),
+	IdDiscador tinyint,
+	IdOrigemLigacao char(1),
+	IdTelefoneLigacao int,
+	UFLigacao char(2),
+	DDDLigacao char(2),
+	NumeroLigacao char(9),
+	DataFinalizacao datetime,
+	IdTelefoneAgendamento int,
+	UFAgendamento char(2),
+	DDDAgendamento char(2),
+	NumeroAgendamento char(9),
+	DataAgendamento datetime,
+	AgendamentoFidelizado char(1),
+	DataInicializacao datetime,
+	IdUsuarioAllure int,
+	IdUsuarioDiscador int,
+	IdDevedor int
+);
