@@ -4,7 +4,7 @@ Create table misitau.dbo.Ocorrencias (
 	IdTitulo int,
 	IdParcela int,
 	IdTipoOcorrencia int,
-	IdOrigeim int,
+	IdOrigem int,
 	IdLigacao int,
 	DataOcorrencia datetime,
 	DataComplementar datetime,
