@@ -1,3 +1,5 @@
+create or alter procedure dbo.ProcProdutos as 
+
 ------------------------------> Descrição da procedure
 
 /*
