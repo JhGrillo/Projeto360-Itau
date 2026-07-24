@@ -1,4 +1,4 @@
-Create or Alter procedure dbo.ProcOrigemLigacoes as
+Create or Alter Procedure dbo.ProcOrigensLigacoes as
 
 ------------------------------> Descrição da procedure
 
