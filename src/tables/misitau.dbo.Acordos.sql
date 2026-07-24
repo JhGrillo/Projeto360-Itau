@@ -9,7 +9,7 @@ Create table misitau.dbo.Acordos (
 	Proposta char(1),
 	DataAprovacaoProposta datetime,
 	IdStatusAcordo tinyint,
-	CodigoAcordoCliente varchar(64),
+	CodigoAcordoCliente varchar(32),
 	DataCancelamento datetime,
 	IdUsuarioCancelamento int
 );
