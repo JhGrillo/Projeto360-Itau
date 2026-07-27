@@ -45,7 +45,7 @@ Begin try
 
 Set @Etapa = 'Criacao das tabelas temporarias';
 
---- | Tipo ocorrências
+--- | Origens
 
 If Object_id('Tempdb..#Origens') Is not null Drop table #Origens;
 Create table #Origens (
