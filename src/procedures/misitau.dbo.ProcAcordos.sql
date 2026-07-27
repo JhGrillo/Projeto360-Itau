@@ -7,10 +7,12 @@ Create or Alter Procedure dbo.ProcAcordos as
 	Nome: ProcAcordos
 	DataCriação: 24/07/2026
 	Criado por: Leonardo Matheus Talarico
-	DataAtualização:
-	Atualizado por:
+	DataAtualização: 27/07/2026
+	Atualizado por: João Henrique Cavalheiro Grillo
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+	Foi incluido a captura dos vencimentos a partir da ultima data de atualização, para atender o processo de vencimentos360.
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -147,7 +149,8 @@ Where
 			From misitau.cob.AcordosParcelasPagar b
 			Where
 				a.IdAcordo = b.IdAcordo
-				and b.DataPagamento >= @DataPagamento)
+				and (b.DataPagamento >= @DataPagamento
+				or b.DataVencimento between @UltimaAtualizacao and Convert(date,Dateadd(hour,-3,Getdate()))))
 	and Not exists (Select 1
 					From misitau.dbo.Acordos c With(nolock)
 					Where
