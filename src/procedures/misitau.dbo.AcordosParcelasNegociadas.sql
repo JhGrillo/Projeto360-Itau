@@ -209,7 +209,7 @@ Create nonclustered index IxAcordosParcelasNegociadas on #AcordosParcelasNegocia
 
 --- | Tabela fisica
 
-Insert into dbo.AcordosParcelasNegociadas (
+Insert into misitau.dbo.AcordosParcelasNegociadas (
 											IdAcordoParcelaNegociada,
 											IdAcordo,
 											IdTitulo,
@@ -295,7 +295,7 @@ Select distinct
 From #AcordosParcelasNegociadas a With(nolock)
 Where
 	Not exists (Select 1
-				From dbo.AcordosParcelasNegociadas b With(nolock)
+				From misitau.dbo.AcordosParcelasNegociadas b With(nolock)
 				Where
 					a.IdAcordo = b.IdAcordo);
 
