@@ -4,7 +4,7 @@ Create or alter procedure dbo.ProcTelefones as
 
 /*
 	Padrão de escrita: PascalCase
-	Nome: ProcAcordos
+	Nome: ProcTelefones
 	DataCriação: 27/07/2026
 	Criado por: Leonardo Matheus Talarico
 	DataAtualização:
@@ -17,7 +17,7 @@ Create or alter procedure dbo.ProcTelefones as
 
 Set Nocount On;
 
-Declare @NomeProcedure varchar(128) = 'ProcAcordos',
+Declare @NomeProcedure varchar(128) = 'ProcTelefones',
         @Etapa varchar(100) = 'Inicio',
 		@UltimaAtualizacao datetime,
 		@DataPagamento datetime,
@@ -142,7 +142,6 @@ Set @Etapa = 'Criacao de indices';
 /* Cria index não clusterizado */
 Create nonclustered index IxTelefones on #Telefones (IdTelefone);
 
-
 ------------------------------> Persistencia final
 
 Set @Etapa = 'Persistencia final';
@@ -214,7 +213,6 @@ Where
 				Where a.IdTelefone = c.IdTelefone
 				and a.DataAtualizacao = c.DataAtualizacao);
 
-
 Set @LinhasAtualizadas = @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + @LinhasAtualizadas;
 Set @DataHoraFim = Dateadd(hour,-3,Getdate());
@@ -243,7 +241,7 @@ Begin Catch
 
 Set @MensagemErro = Error_message();
 Set @NumeroErro = Error_number();
-Set @LinhaErro = Error_line()
+Set @LinhaErro = Error_line();
 
 
 /* Finalizacao execução de log erro */
