@@ -20,7 +20,6 @@ Set Nocount On;
 Declare @NomeProcedure varchar(128) = 'ProcTelefones',
         @Etapa varchar(100) = 'Inicio',
 		@UltimaAtualizacao datetime,
-		@DataPagamento datetime,
         @IdExecucao int,
         @LinhasOrigem int,
         @LinhasInseridas int,
@@ -31,7 +30,6 @@ Declare @NomeProcedure varchar(128) = 'ProcTelefones',
         @MensagemErro varchar(max),
         @NumeroErro int,
         @LinhaErro int;
-
 
 /* Inicia o controle de logs */
 Exec misitau.[log].ProcControles
@@ -77,7 +75,6 @@ Set @Etapa = 'Carga das tabelas temporarias';
 --- | Insere telefones na tabela
 
 Set @IdTelefone = (Select Max(IdTelefone) From misitau.dbo.Telefones With(nolock));
-
 Set @UltimaAtualizacao = (Select 
                             Case
                                 when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,+1,Convert(date,DataHoraInicio)))
@@ -87,7 +84,6 @@ Set @UltimaAtualizacao = (Select
                           Where
                             NomeProcedure = 'ProcTelefones'
                             and StatusExecucao = 'Concluida');
-
 Insert into #Telefones (
 						IdTelefone,
 						IdDevedor,
@@ -130,8 +126,9 @@ Where
 	or DataAtualizacao >= @UltimaAtualizacao)
 	and not exists (Select 1
 					From misitau.dbo.Telefones b
-					Where a.IdTelefone = b.IdTelefone
-					and Isnull(a.DataAtualizacao,'1900-01-01') = Isnull(b.DataAtualizacao,'1900-01-01'));
+					Where 
+						a.IdTelefone = b.IdTelefone
+						and Isnull(a.DataAtualizacao,'1900-01-01') = Isnull(b.DataAtualizacao,'1900-01-01'));
 
 Set @LinhasOrigem = @@RowCount;
 
@@ -187,8 +184,7 @@ From
 	#Telefones a
 Where
 	not exists (Select 1
-				From 
-					misitau.dbo.Telefones b
+				From misitau.dbo.Telefones b
 				Where 
 					a.IdTelefone = b.IdTelefone);
 
@@ -210,8 +206,9 @@ inner join #Telefones b on a.IdTelefone = b.IdTelefone
 Where
 	not exists (Select 1
 				From misitau.dbo.Telefones c
-				Where a.IdTelefone = c.IdTelefone
-				and a.DataAtualizacao = c.DataAtualizacao);
+				Where 
+					a.IdTelefone = c.IdTelefone
+					and a.DataAtualizacao = c.DataAtualizacao);
 
 Set @LinhasAtualizadas = @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + @LinhasAtualizadas;
@@ -235,14 +232,12 @@ Exec misitau.[log].ProcControles
     @DataHoraFim = @DataHoraFim,
     @StatusExecucao = 'Concluida';
 
-
 End Try
 Begin Catch
 
 Set @MensagemErro = Error_message();
 Set @NumeroErro = Error_number();
 Set @LinhaErro = Error_line();
-
 
 /* Finalizacao execução de log erro */
 Set @DataHoraFim = Dateadd(hour,-3,Getdate());
