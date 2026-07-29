@@ -7,12 +7,13 @@ Create or Alter Procedure dbo.ProcAcordos as
 	Nome: ProcAcordos
 	DataCriação: 24/07/2026
 	Criado por: Leonardo Matheus Talarico
-	DataAtualização: 27/07/2026
+	DataAtualização: 29/07/2026
 	Atualizado por: João Henrique Cavalheiro Grillo
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
 
-	Foi incluido a captura dos vencimentos a partir da ultima data de atualização, para atender o processo de vencimentos360.
+	27/07/2026 João Henrique Cavalheiro Grillo: Foi incluido a captura dos vencimentos a partir da ultima data de atualização, para atender o processo de vencimentos360.
+	29/07/2026 João Henrique Cavalheiro Grillo: Incluido na comparação do Not exists a data de cancelamento e proposta para atualizar casos que tiveram alterações no dia
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -125,7 +126,9 @@ Where
 	and Not exists (Select 1
 					From misitau.dbo.Acordos b With(nolock)
 					Where
-						a.IdAcordo = b.IdAcordo)
+						a.IdAcordo = b.IdAcordo
+						and Isnull(a.DataCancelamento,'1900-01-01') = Isnull(b.DataCancelamento,'1900-01-01')
+						and Isnull(a.DataAprovacaoProposta,'1900-01-01') = Isnull(b.DataAprovacaoProposta,'1900-01-01'))
 
 union
 
