@@ -127,6 +127,7 @@ Where
 					From misitau.dbo.Acordos b With(nolock)
 					Where
 						a.IdAcordo = b.IdAcordo
+						and a.IdStatusAcordo = b.IdStatusAcordo
 						and Isnull(a.DataCancelamento,'1900-01-01') = Isnull(b.DataCancelamento,'1900-01-01')
 						and Isnull(a.DataAprovacaoProposta,'1900-01-01') = Isnull(b.DataAprovacaoProposta,'1900-01-01'))
 
