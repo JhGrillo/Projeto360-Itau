@@ -1,9 +1,5 @@
-/****** Object:  StoredProcedure [dbo].[ProcAcordosParcelasNegociadas]    Script Date: 30/07/2026 10:47:50 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-ALTER Procedure [dbo].[ProcAcordosParcelasNegociadas] as
+Create or Alter Table dbo.ProcAcordosParcelasNegociadas as
+
 ------------------------------> Descrição da procedure
 
 /*
@@ -28,7 +24,6 @@ Declare @NomeProcedure varchar(128) = 'ProcAcordosParcelasNegociadas',
         @Etapa varchar(100) = 'Inicio',
 		@UltimaAtualizacao datetime,
 		@DataPagamento datetime,
-		@IdAcordo varchar(max),
 		@SQLAcordosParcelasNegociadas nvarchar(max),
         @IdExecucao int,
         @LinhasOrigem int,
@@ -286,7 +281,7 @@ Where
 /* Cria index clusterizado 
 Obs: Este index é criado fora da etapa de index devido a necessidade de performance no comparativo abaixo.
 */
-Create nonclustered Index IxAcordosInformacoesComplementares on #DadosOrigem (IdAcordo);
+Create nonclustered Index IxAcordosParcelasNegociadas on #DadosOrigem (IdAcordo);
 
 --- | Acordos Parcelas Negociadas
 
