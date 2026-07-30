@@ -1,4 +1,4 @@
-Create or Alter table dbo.ProcAcordosParcelasPagar as 
+Create or Alter Procedure dbo.ProcAcordosParcelasPagar as 
 
 ------------------------------> Descrição da procedure
 
@@ -214,7 +214,8 @@ Where
     Not exists (Select 1
                 From misitau.dbo.AcordosParcelasPagar b With(nolock)
                 Where
-                    a.IdAcordoParcelaPagar = b.IdAcordoParcelaPagar);
+                    a.IdAcordoParcelaPagar = b.IdAcordoParcelaPagar
+                    and Isnull(a.DataPagamento,'1900-01-01') = Isnull(b.DataPagamento,'1900-01-01'));
 
 Set @LinhasInseridas = @@RowCount;
 
