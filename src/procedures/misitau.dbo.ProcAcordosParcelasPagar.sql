@@ -7,7 +7,7 @@ Create or Alter Procedure dbo.ProcAcordosParcelasPagar as
     Nome: ProcAcordosParcelasPagar
     DataCriação: 27/07/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização:
+    DataAtualização:30/07/2026
     Atualizado por:
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
@@ -182,7 +182,8 @@ Where
     Not exists (Select 1
                     From misitau.dbo.AcordosParcelasPagar b With(nolock)
                     Where
-                        a.IdAcordoParcelaPagar = b.IdAcordoParcelaPagar)
+                        a.IdAcordoParcelaPagar = b.IdAcordoParcelaPagar
+                        and Isnull(a.DataPagamento,'1900-01-01') = Isnull(b.DataPagamento,'1900-01-01'))
 
 Set @LinhasOrigem = @@RowCount;
 
@@ -214,8 +215,7 @@ Where
     Not exists (Select 1
                 From misitau.dbo.AcordosParcelasPagar b With(nolock)
                 Where
-                    a.IdAcordoParcelaPagar = b.IdAcordoParcelaPagar
-                    and Isnull(a.DataPagamento,'1900-01-01') = Isnull(b.DataPagamento,'1900-01-01'));
+                    a.IdAcordoParcelaPagar = b.IdAcordoParcelaPagar);
 
 Set @LinhasInseridas = @@RowCount;
 
