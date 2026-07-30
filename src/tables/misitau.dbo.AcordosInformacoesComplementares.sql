@@ -11,8 +11,6 @@ Create table misitau.dbo.AcordosInformacoesComplementares (
 	IdSimulacao varchar(24),
 	IdCondicaoGeral varchar(24),
 	IdResumo varchar(24),
-	JsonResumo varchar(max),
-	CondicoesGeraisBase64 varchar(max),
 	CodigoAlcada smallint,
 	CodigoBanco varchar(4),
 	NumeroAgencia varchar(5),
