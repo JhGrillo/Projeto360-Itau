@@ -1,4 +1,4 @@
-Create or Alter Table dbo.ProcAcordosParcelasNegociadas as
+Create or Alter procedure dbo.ProcAcordosParcelasNegociadas as
 
 ------------------------------> Descrição da procedure
 

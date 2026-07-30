@@ -1,4 +1,4 @@
-Create or Alter procedure dbo.ProcAcordosParcelasPagar as
+Create or Alter Procedure dbo.ProcAcordosParcelasPagar as 
 
 ------------------------------> Descrição da procedure
 
@@ -7,10 +7,13 @@ Create or Alter procedure dbo.ProcAcordosParcelasPagar as
     Nome: ProcAcordosParcelasPagar
     DataCriação: 27/07/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização:
+    DataAtualização:30/07/2026
     Atualizado por:
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+	30/07/2026 Leonardo Matheus Talarico: Foi alterado a forma que captura dados, agora se baseia nas datas da penultima execução da dbo.Acordos para seguir a mesma regra
+	consultando diretamente na origem, agora a procedure é mais escalavel.
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -19,7 +22,8 @@ Set Nocount On;
 
 Declare @NomeProcedure varchar(128) = 'ProcAcordosParcelasPagar',
         @Etapa varchar(100) = 'Inicio',
-        @IdAcordo varchar(max),
+        @UltimaAtualizacao datetime,
+		@DataPagamento datetime,
         @SQLAcordosParcelasPagar nvarchar(max),
         @IdExecucao int,
         @LinhasOrigem int,
@@ -47,6 +51,19 @@ Begin Try
 
 Set @Etapa = 'Criacao das tabelas temporarias';
 
+--- | Origem
+
+If Object_id('Tempdb..#DadosOrigem') Is not null Drop table #DadosOrigem;
+Create table #DadosOrigem (
+    IdAcordoParcelaPagar int,
+    IdAcordo int,
+    NumeroParcela tinyint,
+    DataVencimento date,
+    Valor money,
+    DataPagamento date,
+    ValorPago money
+);
+
 --- | Acordos parcelas pagar
 
 If Object_id('Tempdb..#AcordosParcelasPagar') Is not null Drop table #AcordosParcelasPagar;
@@ -64,23 +81,51 @@ Create table #AcordosParcelasPagar (
 
 Set @Etapa = 'Carga das tabelas temporarias';
 
---- | Insere novos Acordos de Parcelas a Pagar na tabela
+--- | Insere novos acordos na tabela de origem
 
-Set @IdAcordo = (Select 
-                    String_agg(Convert(varchar(max),IdAcordo),',') 
-                From misitau.dbo.Acordos a With(nolock)
-                Where
-                    Not exists (Select 1
-                                From misitau.dbo.AcordosParcelasPagar b With(nolock)
-                                Where
-                                    a.IdAcordo = b.IdAcordo
-                                    and b.DataPagamento is not null));
- 
+Set @UltimaAtualizacao = (Select 
+							Case
+								when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,+1,Convert(date,DataHoraInicio)))
+								else Max(Convert(date,DataHoraInicio))
+							end
+						  From misitau.[log].ControleExecucoes a
+						  Inner join (Select
+										Max(IdExecucao) as IdExecucao
+									  From misitau.log.ControleExecucoes
+									  Where
+										NomeProcedure = 'ProcAcordos'
+										and StatusExecucao = 'Concluida') b on a.IdExecucao < b.IdExecucao
+										
+                          Where
+							NomeProcedure = 'ProcAcordos'
+							and StatusExecucao = 'Concluida');
 
-Set @SQLAcordosParcelasPagar = N'
-Insert into #AcordosParcelasPagar
+Set @DataPagamento = Case
+						when Datepart(dw,@UltimaAtualizacao) = 2 then Convert(date,Dateadd(day,-3,@UltimaAtualizacao))
+						else Convert(date,Dateadd(day,-1,@UltimaAtualizacao))
+					 end;
+
+With AcordosCTE as (
+	Select
+		IdAcordo
+	From misitau.cob.Acordos b
+	Where
+		DataInclusao >= @UltimaAtualizacao
+		or DataCancelamento >= @UltimaAtualizacao
+		or DataAprovacaoProposta >= @UltimaAtualizacao
+) 
+
+Insert into #DadosOrigem (
+					IdAcordoParcelaPagar,
+                    IdAcordo,
+                    NumeroParcela,
+                    DataVencimento,
+                    Valor,
+                    DataPagamento,
+                    ValorPago
+				)
 Select
-    IdAcordoParcelaPagar,
+	IdAcordoParcelaPagar,
     IdAcordo,
     NumeroParcela,
     DataVencimento,
@@ -89,14 +134,56 @@ Select
     ValorPago
 From misitau.cob.AcordosParcelasPagar a
 Where
-    IdAcordo in (' + @IdAcordo + ')
-    and Not exists (Select 1
+	Exists (Select 1
+			From AcordosCTE b
+			Where
+				a.IdAcordo = b.IdAcordo)
+union all
+
+Select
+	IdAcordoParcelaPagar,
+    IdAcordo,
+    NumeroParcela,
+    DataVencimento,
+    Valor,
+    DataPagamento,
+    ValorPago
+From misitau.cob.AcordosParcelasPagar
+Where
+    DataPagamento = @DataPagamento
+    or DataVencimento between @UltimaAtualizacao and Convert(date,Dateadd(hour,-3,Getdate()));
+
+/* Cria index clusterizado 
+Obs: Este index é criado fora da etapa de index devido a necessidade de performance no comparativo abaixo.
+*/
+Create nonclustered Index IxAcordosParcelasPagar on #DadosOrigem (IdAcordo);
+ 
+--- | Acordos Parcelas Pagar
+
+Insert into #AcordosParcelasPagar (
+								    IdAcordoParcelaPagar,
+                                    IdAcordo,
+                                    NumeroParcela,
+                                    DataVencimento,
+                                    Valor,
+                                    DataPagamento,
+                                    ValorPago
+							    )
+Select
+    IdAcordoParcelaPagar,
+    IdAcordo,
+    NumeroParcela,
+    DataVencimento,
+    Valor,
+    DataPagamento,
+    ValorPago
+From #DadosOrigem a
+Where
+    Not exists (Select 1
                     From misitau.dbo.AcordosParcelasPagar b With(nolock)
                     Where
                         a.IdAcordoParcelaPagar = b.IdAcordoParcelaPagar
-                        and Isnull(a.DataPagamento,''1900-01-01'') = Isnull(b.DataPagamento,''1900-01-01''))';
-
-Exec sp_executesql @SQLAcordosParcelasPagar;
+                        and Isnull(a.DataPagamento,'1900-01-01') = Isnull(b.DataPagamento,'1900-01-01'))
 
 Set @LinhasOrigem = @@RowCount;
 
