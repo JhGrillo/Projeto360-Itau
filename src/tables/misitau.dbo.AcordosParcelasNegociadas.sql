@@ -37,6 +37,6 @@ Create table misitau.dbo.AcordosParcelasNegociadas (
 	PercentualJurosMoratoriosCobrado float,
 	NumeroParcela smallint,
 	ValorComissaoAssessoria money,
-	DescricaoParcelas varchar,
+	DescricaoParcelas varchar(256),
 	PercentualDescontoAutorizado float
 );
