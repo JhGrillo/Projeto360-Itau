@@ -1,0 +1,1 @@
+Create nonclustered index IxDevedorInformacaoComplementarInsert on misitau.dbo.DevedoresInformacoesComplementares (IdDevedorInformacaoComplementar, DataAtualizacao);
