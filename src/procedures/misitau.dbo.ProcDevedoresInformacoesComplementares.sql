@@ -13,7 +13,7 @@ Create or alter procedure dbo.ProcDevedoresInformacoesComplementares as
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
 
 	31/07/2026 Leonardo Matheus Talarico: Refatoramento para melhoria de performance, foi criado um novo index na tabela de origem para melhorar o Not Exists, e adicionado
-	uma temporaria antes com carregamento apenas dos dados novos ou atualizados para depois realizar o filtro comparativo com o destino.
+	uma temporaria antes com carregamento apenas dos dados novos ou atualizado para depois realizar o filtro comparativo com o destino.
 
 */
 
@@ -162,7 +162,7 @@ Where
 	Not exists (Select 1
 				From misitau.dbo.DevedoresInformacoesComplementares b With(nolock)
 				Where
-					a.IdDevedor = b.IdDevedor
+					a.IdDevedorInformacaoComplementar = b.IdDevedorInformacaoComplementar
 					and Isnull(a.DataAtualizacao,'1900-01-01') = Isnull(b.DataAtualizacao,'1900-01-01'))
 
 Set @LinhasOrigem = @@RowCount;
