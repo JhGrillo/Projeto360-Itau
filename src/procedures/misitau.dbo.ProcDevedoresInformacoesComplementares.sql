@@ -1,4 +1,4 @@
-Create or Alter procedure dbo.ProcDevedoresInformacoesComplementares as
+Create or alter procedure dbo.ProcDevedoresInformacoesComplementares as
 
 ------------------------------> Descrição da procedure
 
@@ -7,10 +7,14 @@ Create or Alter procedure dbo.ProcDevedoresInformacoesComplementares as
 	Nome: ProcDevedoresInformacoesComplementares
 	DataCriação: 23/07/2026
 	Criado por: João Henrique Cavalheiro Grillo
-	DataAtualização:
-	Atualizado por:
+	DataAtualização: 31/07/2028
+	Atualizado por: Leonardo Matheus Talarico
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+	31/07/2026 Leonardo Matheus Talarico: Refatoramento para melhoria de performance, foi criado um novo index na tabela de origem para melhorar o Not Exists, e adicionado
+	uma temporaria antes com carregamento apenas dos dados novos ou atualizados para depois realizar o filtro comparativo com o destino.
+
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -46,6 +50,22 @@ Begin try
 
 Set @Etapa = 'Criacao das tabelas temporarias';
 
+--- | Origem
+
+If Object_id('Tempdb..#DadosOrigem') Is not null Drop table #DadosOrigem;
+Create table #DadosOrigem (
+	IdDevedorInformacaoComplementar int,
+	DataInclusao datetime,
+	IdUsuarioInclusao int,
+	DataAtualizacao datetime,
+	IdUsuarioAtualizacao int,
+	IdDevedor int,
+	DataNascimento smalldatetime,
+	SexoCliente char(1),
+	ValidoDe datetime2,
+	ValidoAte datetime2
+);
+
 --- | Devedores informações complementares
 
 If Object_id('Tempdb..#DevedoresInformacoesComplementares') Is not null Drop table #DevedoresInformacoesComplementares;
@@ -79,6 +99,41 @@ Set @UltimaAtualizacao = (Select
                             NomeProcedure = 'ProcDevedoresInformacoesComplementares'
                             and StatusExecucao = 'Concluida');
 
+Insert into #DadosOrigem (
+						IdDevedorInformacaoComplementar,
+						DataInclusao,
+						IdUsuarioInclusao,
+						DataAtualizacao,
+						IdUsuarioAtualizacao,
+						IdDevedor,
+						DataNascimento,
+						SexoCliente,
+						ValidoDe,
+						ValidoAte
+						)
+Select
+	IdDevedorInformacaoComplementar,
+	DataInclusao,
+	IdUsuarioInclusao,
+	DataAtualizacao,
+	IdUsuarioAtualizacao,
+	IdDevedor,
+	DataNascimento,
+	SexoCliente,
+	ValidoDe,
+	ValidoAte
+From misitau.cli.DevedoresInformacoesComplementares
+Where
+	IdDevedorInformacaoComplementar > Isnull(@IdDevedorInformacaoComplementar,0)
+	or DataAtualizacao >= @UltimaAtualizacao;
+
+/* Cria index clusterizado 
+Obs: Este index é criado fora da etapa de index devido a necessidade de performance no comparativo abaixo.
+*/
+Create nonclustered index IxDevedorInformacaoComplementar on #DadosOrigem (IdDevedorInformacaoComplementar, DataAtualizacao);
+
+--- | Devedores Informacoes Complementares
+
 Insert into #DevedoresInformacoesComplementares (
 												IdDevedorInformacaoComplementar,
 												DataInclusao,
@@ -102,15 +157,13 @@ Select
 	SexoCliente,
 	ValidoDe,
 	ValidoAte
-From misitau.cli.DevedoresInformacoesComplementares a
+From #DadosOrigem a
 Where
-	(IdDevedorInformacaoComplementar > @IdDevedorInformacaoComplementar
-	or DataAtualizacao >= @UltimaAtualizacao)
-	and Not exists (Select 1
-					From misitau.dbo.DevedoresInformacoesComplementares b With(nolock)
-					Where
-						a.IdDevedor = b.IdDevedor
-						and Isnull(a.DataAtualizacao,'1900-01-01') = Isnull(b.DataAtualizacao,'1900-01-01'))
+	Not exists (Select 1
+				From misitau.dbo.DevedoresInformacoesComplementares b With(nolock)
+				Where
+					a.IdDevedor = b.IdDevedor
+					and Isnull(a.DataAtualizacao,'1900-01-01') = Isnull(b.DataAtualizacao,'1900-01-01'))
 
 Set @LinhasOrigem = @@RowCount;
 
@@ -201,7 +254,6 @@ Exec misitau.[log].ProcControles
 	@IdExecucao = @IdExecucao,
 	@DataHoraFim = @DataHoraFim,
 	@StatusExecucao = 'Concluida';
-
 
 End try
 Begin Catch
