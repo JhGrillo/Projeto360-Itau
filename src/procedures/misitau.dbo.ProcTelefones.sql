@@ -19,6 +19,7 @@ Set Nocount On;
 
 Declare @NomeProcedure varchar(128) = 'ProcTelefones',
         @Etapa varchar(100) = 'Inicio',
+		@IdTelefone int,
 		@UltimaAtualizacao datetime,
         @IdExecucao int,
         @LinhasOrigem int,
