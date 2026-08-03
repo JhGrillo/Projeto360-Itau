@@ -7,10 +7,14 @@ Create or alter procedure dbo.ProcTelefones as
 	Nome: ProcTelefones
 	DataCriação: 27/07/2026
 	Criado por: Leonardo Matheus Talarico
-	DataAtualização:
-	Atualizado por:
+	DataAtualização: 03/08/2026
+	Atualizado por: Leonardo Matheus Talarico
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+	03/08/2026 Leonardo Matheus Talarico: Exclusão em algumas colunas na tabela de Telefones,
+	por conta de sua alta demanda de servidor, fazendo com que o processo de mapeamento de indíces
+	apresente erro. 
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -60,13 +64,7 @@ Create table #Telefones (
 	Numero char(9),
 	Pontuacao decimal,
 	DataInclusao datetime,
-	DataAtualizacao datetime,
-	IdTipoTelefone tinyint,
-	WhatsApp char(1),
-	CPC char(1),
-	DataUltimoCPC datetime,
-	IdEnriquecimento int,
-	IdFornecedor int
+	DataAtualizacao datetime
 );
 
 ------------------------------> Carga das tabelas temporarias
@@ -95,13 +93,7 @@ Insert into #Telefones (
 						Numero,
 						Pontuacao,
 						DataInclusao,
-						DataAtualizacao,
-						IdTipoTelefone,
-						WhatsApp,
-						CPC,
-						DataUltimoCPC,
-						IdEnriquecimento,
-						IdFornecedor
+						DataAtualizacao
 						)
 Select
 	IdTelefone,
@@ -113,13 +105,7 @@ Select
 	Numero,
 	Pontuacao,
 	DataInclusao,
-	DataAtualizacao,
-	IdTipoTelefone,
-	WhatsApp,
-	CPC,
-	DataUltimoCPC,
-	IdEnriquecimento,
-	IdFornecedor
+	DataAtualizacao
 From
 	misitau.cob.Telefones a
 Where
@@ -156,13 +142,7 @@ Insert into misitau.dbo.Telefones (
 								   Numero,
 								   Pontuacao,
 								   DataInclusao,
-								   DataAtualizacao,
-								   IdTipoTelefone,
-								   WhatsApp,
-								   CPC,
-								   DataUltimoCPC,
-								   IdEnriquecimento,
-								   IdFornecedor
+								   DataAtualizacao
 								   )
 Select
 	IdTelefone,
@@ -174,13 +154,7 @@ Select
 	Numero,
 	Pontuacao,
 	DataInclusao,
-	DataAtualizacao,
-	IdTipoTelefone,
-	WhatsApp,
-	CPC,
-	DataUltimoCPC,
-	IdEnriquecimento,
-	IdFornecedor
+	DataAtualizacao
 From
 	#Telefones a
 Where
@@ -199,9 +173,7 @@ Set @Etapa = 'Atualizacao de dados';
 
 Update a
 Set a.DataAtualizacao = b.DataAtualizacao,
-	a.Whatsapp = b.Whatsapp,
-	a.Cpc = b.Cpc,
-	a.DataUltimoCpc = b.DataUltimoCpc
+	a.Pontuacao = b.Pontuacao
 From misitau.dbo.Telefones a
 inner join #Telefones b on a.IdTelefone = b.IdTelefone
 Where
