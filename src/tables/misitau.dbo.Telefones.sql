@@ -8,12 +8,6 @@ Create table misitau.dbo.Telefones (
 	Numero char(9),
 	Pontuacao decimal,
 	DataInclusao datetime,
-	DataAtualizacao datetime,
-	IdTipoTelefone tinyint,
-	WhatsApp char(1),
-	CPC char(1),
-	DataUltimoCPC datetime,
-	IdEnriquecimento int,
-	IdFornecedor int
+	DataAtualizacao datetime
 );
 
