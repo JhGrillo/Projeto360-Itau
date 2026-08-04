@@ -78,8 +78,8 @@ Set @Etapa = 'Carga das tabelas temporarias';
 --- | Insere novos acordos na tabela de origem
 
 Insert into #DadosOrigem (
-                          IdDevedor,
-                          IdCarteira
+                          IdCarteira,
+                          IdDevedor
                           )
 Select 
     IdCarteira,
@@ -137,10 +137,10 @@ Insert into #Mailing (
 Select
     IdCarteira,
     IdDevedor
-From #DadosOrigem
+From #DadosOrigem a
 Where 
     Not exists (Select 1
-                From misitau.dbo.Mailing With(nolock)
+                From misitau.dbo.Mailing b With(nolock)
                 Where 
                     a.IdDevedor = b.IdDevedor
                     and a.IdCarteira = b.IdCarteira);
@@ -166,8 +166,8 @@ Insert into misitau.dbo.Mailing (
                                 IdDevedor
                                 )
 Select
-    IdCarteira,
-    IdDevedor
+    a.IdCarteira,
+    a.IdDevedor
 From #Mailing a
 Where
     Not exists (Select 1

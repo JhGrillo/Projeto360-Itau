@@ -1,5 +1,6 @@
 Create table misitau.dbo.Mailing (
-	IdDevedor int Constraint PkDevedor Primary Key Clustered,
+	IdDevedor int,
 	IdCarteira int,
-	IdRetirada int
+	IdRetirada int,
+	Constraint PkMailing Primary Key Clustered (IdDevedor, IdCarteira) 
 );
