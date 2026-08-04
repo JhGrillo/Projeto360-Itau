@@ -1,0 +1,23 @@
+Create table dbo.Base (
+    CodigoReferencia smallint,
+    Carteira varchar(64),
+    Produto varchar(64),
+    SubProduto varchar(10),
+    Cluster varchar(4),
+    IdDevedor int,
+    CnpjCpf varchar(14),
+    IdTitulo int,
+    NumeroContrato varchar(32),
+    RazaoSocialNome varchar(128),
+    Plano smallint,
+    NumeroParcela smallint,
+    DataInclusao datetime,
+    DataVencimento datetime,
+    DiasEmAtraso int,
+    FaixaAtraso varchar(32),
+    Risco money,
+    SaldoVencido money,
+    ValorRegularizacao money,
+    FaixaValor varchar(32),
+    Constraint IxBase primary key (IdDevedor, IdTitulo)
+);
