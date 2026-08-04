@@ -206,10 +206,10 @@ Set a.IdRetirada = 2
 From misitau.dbo.Mailing a
 WHere
     Not Exists (Select 1
-                From misitau.dbo.Mailing b
+                From #DadosOrigem b
                 Where
                     a.IdCarteira = b.IdCarteira
-                    and a.IdDevedor = b.IdCarteira);
+                    and a.IdDevedor = b.IdDevedor);
 
 Set @LinhasAtualizadas += @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + isnull(@LinhasAtualizadas, 0);
