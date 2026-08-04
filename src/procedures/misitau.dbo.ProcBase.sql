@@ -1,4 +1,4 @@
-Create or Alter procedure [dbo].[ProcBase] as
+Create or Alter procedure dbo.ProcBase as
 
 ------------------------------> Descrição da procedure
 
@@ -7,10 +7,14 @@ Create or Alter procedure [dbo].[ProcBase] as
     Nome: ProcBase
     DataCriação: 04/08/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização:
-    Atualizado por:
+    DataAtualização: 04/08/2026
+    Atualizado por: João Henrique Cavalheiro Grillo
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+    04/08/2026 João Henrique Cavalheiro Grillo: Foi retirado da procedure colunas que realizavam calculos
+    com regras de negócios, pois a ideia de procedure ProcBase é armazenar dados de clientes ativos, qualquer calculo
+    de regra de negócio é feito no processo que usara a dbo.Base como origem.
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -129,7 +133,6 @@ Create table #Base (
     CodigoReferencia smallint,
     Carteira varchar(64),
     Produto varchar(64),
-    SubProduto varchar(10),
     Cluster varchar(4),
     IdDevedor int,
     CnpjCpf varchar(14),
@@ -140,12 +143,10 @@ Create table #Base (
     NumeroParcela smallint,
     DataInclusao datetime,
     DataVencimento datetime,
-    DiasEmAtraso int,
-    FaixaAtraso varchar(32),
     Risco money,
     SaldoVencido money,
     ValorRegularizacao money,
-    FaixaValor varchar(32)
+    AreaNegocio varchar(2)
 );
 
 ------------------------------> Carga das tabelas temporarias
@@ -284,7 +285,6 @@ Insert into #Base (
                 CodigoReferencia,
                 Carteira,
                 Produto,
-                SubProduto,
                 Cluster,
                 IdDevedor,
                 CnpjCpf,
@@ -295,18 +295,15 @@ Insert into #Base (
                 NumeroParcela,
                 DataInclusao,
                 DataVencimento,
-                DiasEmAtraso,
-                FaixaAtraso,
                 Risco,
                 SaldoVencido,
                 ValorRegularizacao,
-                FaixaValor
+                AreaNegocio
                 )
 Select
     d.CodigoReferencia,
     d.Carteira,
     e.Produto,
-    Calc.SubProduto,
     Case 
         when Coalesce(b.CodigoClusterScore, esc.Cluster, prop.Cluster) In ('A0', 'A00')				 Then 'A0'
         when Coalesce(b.CodigoClusterScore, esc.Cluster, prop.Cluster) In ('A1', 'A01')				 Then 'A1'
@@ -326,66 +323,17 @@ Select
     a.NumeroParcela,
     Coalesce(a.DataReabertura, a.DataInclusao) as DataInclusao,
     a.DataVencimento,
-    Calc.DiasEmAtraso,
-    Case 
-        when Calc.SubProduto = 'NCOR' then
-            Case
-                when Calc.DiasEmAtraso <= 90   then '01.Menor que 91'
-                when Calc.DiasEmAtraso <= 180  then '02.91 a 180'
-                when Calc.DiasEmAtraso <= 360  then '03.181 a 360'
-                when Calc.DiasEmAtraso <= 720  then '04.361 a 720'
-                when Calc.DiasEmAtraso <= 1200 then '05.721 a 1200'
-                when Calc.DiasEmAtraso <= 1500 then '06.1201 a 1500'
-                when Calc.DiasEmAtraso <= 1800 then '07.1501 a 1800'
-                when Calc.DiasEmAtraso <= 2300 then '08.1801 a 2300'
-                when Calc.DiasEmAtraso > 2300  then '09.Acima de 2300'
-                else '00.Sem faixa'
-            end
-        when Calc.SubProduto = 'BFP' then
-            Case
-                when Calc.DiasEmAtraso < 5     then '00.Sem faixa'
-                when Calc.DiasEmAtraso <= 30   then '01.5 a 30'
-                when Calc.DiasEmAtraso <= 60   then '02.31 a 60'
-                when Calc.DiasEmAtraso <= 90   then '03.61 a 90'
-                when Calc.DiasEmAtraso <= 180  then '04.91 a 180'
-                when Calc.DiasEmAtraso <= 360  then '05.181 a 360'
-                when Calc.DiasEmAtraso <= 720  then '06.361 a 720'
-                when Calc.DiasEmAtraso <= 1200 then '07.721 a 1200'
-                when Calc.DiasEmAtraso <= 1500 then '08.1201 a 1500'
-                when Calc.DiasEmAtraso <= 1800 then '09.1501 a 1800'
-                when Calc.DiasEmAtraso <= 2300 then '10.1801 a 2300'
-                when Calc.DiasEmAtraso > 2300  then '11.Acima de 2300'
-                else '00.Sem faixa'
-            end
-        else '00.Sem faixa'
-    end as FaixaAtraso,
     a.Risco,
     a.SaldoVencido,
     b.ValorContratoAtualizado as ValorRegularizacao,
-    Case
-        when Coalesce(b.ValorContratoAtualizado,a.Risco) <= 500   then '01.0 a 500'
-        when Coalesce(b.ValorContratoAtualizado,a.Risco) <= 1000  then '02.501 a 1000'
-        when Coalesce(b.ValorContratoAtualizado,a.Risco) <= 2000  then '03.1001 a 2000'
-        when Coalesce(b.ValorContratoAtualizado,a.Risco) <= 5000  then '04.2001 a 5000'
-        when Coalesce(b.ValorContratoAtualizado,a.Risco) <= 7000  then '05.5001 a 7000'
-        when Coalesce(b.ValorContratoAtualizado,a.Risco) <= 20000 then '06.7001 a 20000'
-        when Coalesce(b.ValorContratoAtualizado,a.Risco) <= 80000 then '07.20001 a 80000'
-        when Coalesce(b.ValorContratoAtualizado,a.Risco) > 80000  then '08.Acima de 80000'
-        else '00.Sem faixa'
-    end as FaixaValor
+    b.AreaNegocio
 From #Parcelas a
 Inner join #Titulos b on a.IdTitulo = b.IdTitulo
 Inner join #Devedores c on b.IdDevedor = c.IdDevedor
 Inner join #Carteiras d on b.IdCarteira = d.IdCarteira
 Inner join #Produtos e on b.IdProduto = e.IdProduto
 Left join #Escob esc on a.IdTitulo = esc.IdTitulo
-Left join #Propensao prop on a.IdTitulo = prop.IdTitulo
-Cross Apply (Select 
-                Datediff(day,a.DataVencimento,Convert(date,Dateadd(hour,-3,Getdate()))) as DiasEmAtraso,
-                Case
-                    when b.AreaNegocio in ('02','2','11') then 'NCOR'
-                    when b.AreaNegocio in ('01','1')    then 'BFP'
-                end as SubProduto) Calc;
+Left join #Propensao prop on a.IdTitulo = prop.IdTitulo;
 
 ------------------------------> Persistencia final
 
@@ -398,7 +346,6 @@ Insert into misitau.dbo.Base (
                             CodigoReferencia,
                             Carteira,
                             Produto,
-                            SubProduto,
                             Cluster,
                             IdDevedor,
                             CnpjCpf,
@@ -409,18 +356,15 @@ Insert into misitau.dbo.Base (
                             NumeroParcela,
                             DataInclusao,
                             DataVencimento,
-                            DiasEmAtraso,
-                            FaixaAtraso,
                             Risco,
                             SaldoVencido,
                             ValorRegularizacao,
-                            FaixaValor
+                            AreaNegocio
                             )
 Select
     CodigoReferencia,
     Carteira,
     Produto,
-    SubProduto,
     Cluster,
     IdDevedor,
     CnpjCpf,
@@ -431,12 +375,10 @@ Select
     NumeroParcela,
     DataInclusao,
     DataVencimento,
-    DiasEmAtraso,
-    FaixaAtraso,
     Risco,
     SaldoVencido,
     ValorRegularizacao,
-    FaixaValor
+    AreaNegocio
 From #Base a;
 
 Set @LinhasInseridas = @@RowCount;
