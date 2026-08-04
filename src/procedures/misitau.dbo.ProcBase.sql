@@ -1,4 +1,4 @@
-Create or Alter procedure dbo.ProcBase as
+Create or Alter procedure [dbo].[ProcBase] as
 
 ------------------------------> Descrição da procedure
 
@@ -410,6 +410,7 @@ Insert into misitau.dbo.Base (
                             DataInclusao,
                             DataVencimento,
                             DiasEmAtraso,
+                            FaixaAtraso,
                             Risco,
                             SaldoVencido,
                             ValorRegularizacao,
@@ -431,6 +432,7 @@ Select
     DataInclusao,
     DataVencimento,
     DiasEmAtraso,
+    FaixaAtraso,
     Risco,
     SaldoVencido,
     ValorRegularizacao,
