@@ -1,4 +1,4 @@
-Create or Alter procedure dbo.ProcBase as
+Create or Alter procedure dbo.ProcBase as 
 
 ------------------------------> Descrição da procedure
 
@@ -382,6 +382,8 @@ Select
 From #Base a;
 
 Set @LinhasInseridas = @@RowCount;
+Set @LinhasTotaisDestino = @LinhasInseridas;
+Set @DataHoraFim = Dateadd(hour,-3,Getdate());
 
 ------------------------------> Atualizacao de dados
 
