@@ -11,6 +11,7 @@ Create or alter procedure itau.ProcBase360 as
     Atualizado por:
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
+
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -69,7 +70,8 @@ Create table #Base360 (
 	SaldoVencido money,
 	ValorRegularizacao money,
 	AreaNegocio varchar(2),
-	FaixaValor varchar(32)
+	FaixaValor varchar(32),
+	IdRetirada int
 );
 
 ------------------------------> Carga das tabelas temporarias
@@ -124,9 +126,9 @@ From misitau.dbo.Base With(nolock);');
 
 Set @LinhasOrigem = @@RowCount;
 
-/* Atualização de dados
-Obs: Esta etapa faz a carga das colunas que necessitam que um cálculo seja feito.
-*/
+------------------------------> Etapa de calculo
+
+Set @Etapa = 'Etapa de calculo';
 
 --- | Subproduto
 
@@ -196,8 +198,12 @@ Set a.FaixaValor = Case
 					end
 From #Base360 a;
 
+------------------------------> Criação de indices
+
+Set @Etapa = 'Criacao de indices';
+
 /* Cria index não clusterizado */
-Create nonclustered index IxBase on #Base360 (IdDevedor, IdTitulo, Data) ;
+Create nonclustered index IxBase on #Base360 (IdDevedor, IdTitulo, Data);
 
 ------------------------------> Persistencia final
 
@@ -270,15 +276,30 @@ From dbDataDwItau.itau.Base360 a With(nolock)
 inner join #Base360 b on a.IdDevedor = b.IdDevedor
 					     and a.IdTitulo = b.IdTitulo
 Where
-	Isnull(a.NumeroParcela, '') <> Isnull(b.NumeroParcela,'')
-	or Isnull(a.DataInclusao, '') <> Isnull(b.DataInclusao,'')
-	or Isnull(a.DiasEmAtraso, '') <> Isnull(b.DiasEmAtraso, '')
-	or Isnull(a.Risco, '') <> Isnull(b.Risco, '')
-	or Isnull(a.SaldoVencido, '') <> Isnull(b.SaldoVencido, '')
-	or Isnull(a.ValorRegularizacao, '') <> Isnull(b.ValorRegularizacao, '');
+	Isnull(a.NumeroParcela,'') <> Isnull(b.NumeroParcela,'')
+	or Isnull(a.DataInclusao,'') <> Isnull(b.DataInclusao,'')
+	or Isnull(a.DiasEmAtraso,'') <> Isnull(b.DiasEmAtraso,'')
+	or Isnull(a.Risco,'') <> Isnull(b.Risco,'')
+	or Isnull(a.SaldoVencido,'') <> Isnull(b.SaldoVencido,'')
+	or Isnull(a.ValorRegularizacao,'') <> Isnull(b.ValorRegularizacao,'');
 
 Set @LinhasAtualizadas = @@RowCount;
-Set @LinhasTotaisDestino = @LinhasInseridas + Isnull(@LinhasAtualizadas, 0);
+
+Update a
+Set a.IdRetirada = 1
+From dbDataDwItau.itau.Base360 a With(nolock)
+inner join #Base360 b on a.IdDevedor = b.IdDevedor
+					     and a.IdTitulo = b.IdTitulo
+Where
+	Not Exists (Select 1
+				From #Base360 c
+				Where 
+					a.IdDevedor = c.IdDevedor
+					and a.IdTitulo = c.IdTitulo
+					and a.Data = b.Data)
+
+Set @LinhasAtualizadas += @@RowCount;
+Set @LinhasTotaisDestino = @LinhasInseridas + isnull(@LinhasAtualizadas, 0);
 Set @DataHoraFim = Getdate();
 
 /* Grava volumetria controles de log */
@@ -307,7 +328,7 @@ Set @NumeroErro = Error_number();
 Set @LinhaErro = Error_line();
 
 /* Finalizacao execução de log erro */
-Set @DataHoraFim = Getdate();
+Set @DataHoraFim = Dateadd(hour,-3,Getdate());
 Exec dbDataDwItau.[log].ProcControles
     @TipoLog = 'Atualizacao',
     @IdExecucao = @IdExecucao,

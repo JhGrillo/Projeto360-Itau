@@ -21,5 +21,6 @@ Create table dbDataDwItau.itau.Base360 (
 	ValorRegularizacao money,
 	AreaNegocio varchar(2),
 	FaixaValor varchar(32),
+	IdRetirada int,
 	Constraint PkBase360 primary key clustered (IdDevedor, IdTitulo)
 );
