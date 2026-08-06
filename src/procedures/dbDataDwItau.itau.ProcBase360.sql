@@ -267,14 +267,23 @@ Set @Etapa = 'Atualizacao de dados';
 
 --- | Atualiza campos da tabela fisica
 
+/* Atualiza campos que tiveram alterações em seu contrato */
+
 Update a
-Set a.DiasEmAtraso = b.DiasEmAtraso,
-	a.SaldoVencido = b.SaldoVencido,
+Set a.Plano = b.Plano,
+	a.NumeroParcela = b.NumeroParcela,
+	a.DataInclusao = b.DataInclusao,
+	a.DataVencimento = b.DataVencimento,
+	a.DiasEmAtraso = b.DiasEmAtraso,
+	a.FaixaAtraso = b.FaixaAtraso,
 	a.Risco = b.Risco,
+	a.SaldoVencido = b.SaldoVencido,
+	a.ValorRegularizacao = b.ValorRegularizacao,
 	a.FaixaValor = b.FaixaValor
 From dbDataDwItau.itau.Base360 a With(nolock)
 inner join #Base360 b on a.IdDevedor = b.IdDevedor
 					     and a.IdTitulo = b.IdTitulo
+						 and a.Data = b.Data
 Where
 	Isnull(a.NumeroParcela,'') <> Isnull(b.NumeroParcela,'')
 	or Isnull(a.DataInclusao,'') <> Isnull(b.DataInclusao,'')
@@ -285,17 +294,17 @@ Where
 
 Set @LinhasAtualizadas = @@RowCount;
 
+/* Marcação de contratos devolvidos/retirados */
+
 Update a
 Set a.IdRetirada = 1
 From dbDataDwItau.itau.Base360 a With(nolock)
-inner join #Base360 b on a.IdDevedor = b.IdDevedor
-					     and a.IdTitulo = b.IdTitulo
 Where
 	Not Exists (Select 1
-				From #Base360 c
+				From #Base360 b
 				Where 
-					a.IdDevedor = c.IdDevedor
-					and a.IdTitulo = c.IdTitulo
+					a.IdDevedor = b.IdDevedor
+					and a.IdTitulo = b.IdTitulo
 					and a.Data = b.Data)
 
 Set @LinhasAtualizadas += @@RowCount;
