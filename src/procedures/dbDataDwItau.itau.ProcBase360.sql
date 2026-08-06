@@ -285,8 +285,8 @@ Set @DataHoraFim = Getdate();
 Exec dbDataDwItau.[log].ProcControles
     @TipoLog = 'Volumetria',
     @IdExecucao = @IdExecucao,
-    @NomeTabelaOrigem = 'cob.AcordosParcelasPagar',
-    @NomeTabelaDestino = 'dbo.AcordosParcelasPagar',
+    @NomeTabelaOrigem = 'dbo.Base',
+    @NomeTabelaDestino = 'dbo.Base360',
     @LinhasOrigem = @LinhasOrigem,
     @LinhasInseridas = @LinhasInseridas,
     @LinhasAtualizadas = @LinhasAtualizadas,
@@ -307,7 +307,7 @@ Set @NumeroErro = Error_number();
 Set @LinhaErro = Error_line();
 
 /* Finalizacao execução de log erro */
-Set @DataHoraFim = Dateadd(hour,-3,Getdate());
+Set @DataHoraFim = Getdate();
 Exec dbDataDwItau.[log].ProcControles
     @TipoLog = 'Atualizacao',
     @IdExecucao = @IdExecucao,
