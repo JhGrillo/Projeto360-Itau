@@ -278,7 +278,7 @@ Where
 	or Isnull(a.ValorRegularizacao, '') <> Isnull(b.ValorRegularizacao, '');
 
 Set @LinhasAtualizadas = @@RowCount;
-Set @LinhasTotaisDestino = @LinhasInseridas + @LinhasAtualizadas;
+Set @LinhasTotaisDestino = @LinhasInseridas + Isnull(@LinhasAtualizadas, 0);
 Set @DataHoraFim = Getdate();
 
 /* Grava volumetria controles de log */
