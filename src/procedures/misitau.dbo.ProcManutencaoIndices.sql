@@ -1,4 +1,4 @@
-Create or Alter procedure dbo.ProcManutencaoIndices as
+Create or Alter procedure [dbo].[ProcManutencaoIndices] as
 
 ------------------------------> Descrição da procedure
 
@@ -7,10 +7,13 @@ Create or Alter procedure dbo.ProcManutencaoIndices as
 	Nome: ProcManutencaoIndices
 	DataCriação: 22/07/2026
 	Criado por: João Henrique Cavalheiro Grillo
-	DataAtualização:
-	Atualizado por:
+	DataAtualização: 06/08/2026
+	Atualizado por: João Henrique Cavalheiro Grillo
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
+    06/08/2026 João Henrique Cavalheiro Grillo: O processo não estava marcando concluído no log
+    quando não havia nenhuma tabela para fazer manutenção, pois o Exec estava dentro do While contador de tabelas.
+
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -128,7 +131,6 @@ Begin catch
 Set @MensagemErro = Error_message();
 Set @NumeroErro = Error_number();
 Set @LinhaErro = Error_line()
-
 
 /* Finalizacao execução de log erro */
 Set @DataHoraFim = Dateadd(hour,-3,Getdate());
