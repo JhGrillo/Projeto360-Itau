@@ -1,4 +1,5 @@
 Create table dbDataDwItau.itau.Base360 (
+    IdBase int constraint PkBase primary key clustered,
 	Data datetime,
 	CodigoReferencia smallint,
 	Carteira varchar(64),
@@ -22,5 +23,4 @@ Create table dbDataDwItau.itau.Base360 (
 	AreaNegocio varchar(2),
 	FaixaValor varchar(32),
 	IdRetirada int,
-	Constraint PkBase360 primary key clustered (IdDevedor, IdTitulo)
 );
