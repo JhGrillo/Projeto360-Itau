@@ -1,0 +1,1 @@
+Create nonclustered index IxBase360Data on dbDataDwItau.itau.Base360 (Data);    
