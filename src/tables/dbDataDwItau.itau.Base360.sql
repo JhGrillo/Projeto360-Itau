@@ -1,5 +1,5 @@
 Create table dbDataDwItau.itau.Base360 (
-    IdBase int constraint PkBase primary key clustered,
+    IdBase int identity constraint PkBase primary key clustered,
 	Data datetime,
 	CodigoReferencia smallint,
 	Carteira varchar(64),
