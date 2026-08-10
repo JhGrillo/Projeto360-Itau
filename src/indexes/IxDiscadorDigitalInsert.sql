@@ -1,0 +1,1 @@
+Create nonclustered index IxDiscadorDigitalInsert on itau.DiscadorDigital360 (IdDevedor, IdTitulo, Data);
