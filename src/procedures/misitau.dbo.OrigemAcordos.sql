@@ -87,7 +87,23 @@ Select
 	a.IdAcordo,
 	Isnull(b.IdOrigemLigacao, 'H') as IdOrigemAcordo
 From OrigemCTE a With(nolock)
-Left join misitau.dbo.Ligacoes b With(nolock) on a.IdLigacao = b.IdLigacao
+Left join misitau.dbo.Ligacoes b With(nolock) on a.IdLigacao = b.IdLigacao;
+
+/* Cria index clusterizado
+Obs: Este index é criado fora da etapade index devido a necessidade de performance no comparativo abaixo
+*/
+Create nonclustered Index IxOrigemAcordos on #DadosOrigem (IdAcordo);
+
+--- | Origem Acordos
+
+Insert into #OrigemAcordos (
+							IdAcordo,
+							IdOrigemAcordo
+						   )
+Select
+	IdAcordo,
+	IdOrigemAcordo
+From #DadosOrigem a
 Where
 	Not exists (Select 1
 				From misitau.dbo.OrigemAcordos b With(nolock)
