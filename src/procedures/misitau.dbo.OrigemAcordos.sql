@@ -1,4 +1,4 @@
-Create or alter procedure [dbo].[ProcOrigemAcordos] as 
+Create or alter procedure dbo.ProcOrigemAcordos as 
 
 ------------------------------> Descrição da procedure
 
@@ -48,6 +48,14 @@ Begin Try
 
 Set @Etapa = 'Criacao das tabelas temporarias';
 
+--- | Origem
+
+If Object_id('Tempdb..#DadosOrigem') Is not null Drop table #DadosOrigem
+Create table #DadosOrigem (
+	IdAcordo int,
+	IdOrigemAcordo char(1)
+)
+
 --- | OrigemAcordos
 
 If Object_id('Tempdb..#OrigemAcordos') Is not null Drop table #OrigemAcordos
@@ -62,17 +70,29 @@ Set @Etapa = 'Carga das tabelas temporarias';
 
 --- | Insere as Origens dos Acordos
 
-Insert into #OrigemAcordos (
+With OrigemCTE as (
+	Select
+		a.IdAcordo,
+		a.IdLigacao
+	From misitau.dbo.Ocorrencias a With(nolock)
+	Where
+		a.IdAcordo is not null
+)
+
+Insert into #DadosOrigem (
 							IdAcordo,
 							IdOrigemAcordo
 						   )
 Select
 	a.IdAcordo,
 	Isnull(b.IdOrigemLigacao, 'H') as IdOrigemAcordo
-From misitau.dbo.Ocorrencias a With(nolock)
+From OrigemCTE a With(nolock)
 Left join misitau.dbo.Ligacoes b With(nolock) on a.IdLigacao = b.IdLigacao
 Where
-	a.IdAcordo is not null;
+	Not exists (Select 1
+				From misitau.dbo.OrigemAcordos b With(nolock)
+				Where
+					a.IdAcordo = b.IdAcordo)
 
 Set @LinhasOrigem = @@RowCount;
 
