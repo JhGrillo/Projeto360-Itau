@@ -1,0 +1,1 @@
+Create nonclustered index IxDiscadorDigitalBase on itau.DiscadorDigital360 (IdBase);
