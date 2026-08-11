@@ -1,4 +1,4 @@
-Create or alter procedure itau.ProcVencimentos360 as 
+Create or Alter Procedure itau.ProcVencimentos360 as
 
 ------------------------------> Descrição da procedure
 
@@ -186,6 +186,7 @@ From
 --- | Vencimentos Final
 
 Insert into #VencimentosFinal (
+							  IdBase,
 							  Data,
 							  IdDevedor,
 							  IdTitulo,
@@ -197,6 +198,7 @@ Insert into #VencimentosFinal (
 							  IdOrigemAcordo
 							  )
 Select
+	a.IdBase,
 	a.Data,
 	a.IdDevedor,
 	a.IdTitulo,
