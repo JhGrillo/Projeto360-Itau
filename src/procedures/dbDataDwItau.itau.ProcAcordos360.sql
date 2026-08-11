@@ -318,17 +318,6 @@ Set @Etapa = 'Atualizacao de dados';
 
 --- | Atualiza campos da tabela fisica
 
-/* Atualiza a Origem Acordos */
-
-Update a
-Set a.IdOrigemAcordo = b.IdOrigemAcordo
-From dbDataDwItau.itau.Acordos360 a With(nolock)
-Inner join #AcordosFinal b on a.IdAcordo = b.IdAcordo
-
-Set @LinhasAtualizadas = @@RowCount;
-
-/* Atualiza a Proposta e Cancelamento */
-
 Update a
 Set a.Proposta = b.Proposta,
 	a.DataAprovacaoProposta = b.DataAprovacaoProposta,

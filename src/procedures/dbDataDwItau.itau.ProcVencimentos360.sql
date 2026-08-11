@@ -150,8 +150,8 @@ From misitau.dbo.AcordosParcelasPagar a With(nolock)
 Inner join misitau.dbo.Acordos b With(nolock) on a.IdAcordo = b.IdAcordo
 Inner join misitau.dbo.AcordosParcelasNegociadas c With(nolock) on a.IdAcordo =c.IdAcordo
 Where
-	DataVencimento = Convert(date, Dateadd(hour,-3,Getdate()))
-	or Convert(date,b.DataCancelamento) = Convert(date, Dateadd(hour,-3,Getdate()));');
+	DataVencimento = Dateadd(hour,-3,Getdate())
+	or Convert(date,b.DataCancelamento) = Dateadd(hour,-3,Getdate());');
 
 --- | Origem Acordos
 
@@ -265,8 +265,24 @@ Where
 					and a.Data = b.Data)
 
 Set @LinhasInseridas = @@RowCount;
-Set @LinhasTotaisDestino = @LinhasInseridas;
-Set @DataHoraFim = Dateadd(hour,-3,Getdate());
+
+------------------------------> Atualizacao de dados
+
+Set @Etapa = 'Atualizacao de dados';
+
+--- | Atualiza campos da tabela fisica
+
+Update a
+Set a.DataCancelamento = b.DataCancelamento
+From dbDataDwItau.itau.Vencimentos360 a with(nolock)
+inner join #VencimentosFinal b with(nolock) on a.IdAcordo = b.IdAcordo
+Where
+	b.DataCancelamento is not null
+	and a.DataCancelamento is null;
+
+Set @LinhasAtualizadas = @@RowCount;
+Set @LinhasTotaisDestino = @LinhasInseridas + isnull(@LinhasAtualizadas, 0);
+Set @DataHoraFim = Getdate();
 	
 /* Grava volumetria controles de log */
 Exec dbDataDwItau.[log].ProcControles

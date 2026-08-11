@@ -1,5 +1,5 @@
 Create table dbDataDwItau.itau.Acordos360 (
-	IdAcordos int constraint PkAcordos primary key clustered,
+	IdAcordos int identity constraint PkAcordos primary key clustered,
 	IdBase int,
 	Data datetime,
 	IdDevedor int,
