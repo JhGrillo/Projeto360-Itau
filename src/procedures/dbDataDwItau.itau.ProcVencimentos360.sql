@@ -150,8 +150,8 @@ From misitau.dbo.AcordosParcelasPagar a With(nolock)
 Inner join misitau.dbo.Acordos b With(nolock) on a.IdAcordo = b.IdAcordo
 Inner join misitau.dbo.AcordosParcelasNegociadas c With(nolock) on a.IdAcordo =c.IdAcordo
 Where
-	DataVencimento = convert(date, Getdate())
-	or Convert(date,b.DataCancelamento) = convert(date, Getdate());');
+	DataVencimento = Dateadd(hour,-3,Getdate())
+	or Convert(date,b.DataCancelamento) = Dateadd(hour,-3,Getdate());');
 
 --- | Origem Acordos
 
