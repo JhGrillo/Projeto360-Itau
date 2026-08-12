@@ -1,4 +1,4 @@
-Create or alter procedure itau.ProcAcordos360 as
+Create or alter Procedure itau.ProcAcordos360 as
 
 ------------------------------> Descrição da procedure
 
@@ -7,10 +7,12 @@ Create or alter procedure itau.ProcAcordos360 as
 	Nome: ProcAcordos360
 	DataCriação: 07/08/2026
 	Criado por: Leonardo Matheus Talarico
-	DataAtualização: 
-	Atualizado por: 
+	DataAtualização: 12/08/2026
+	Atualizado por: Leonardo Matheus Talarico
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+	12/08/2026 Leonardo Matheus Talarico: Foi atualizado a forma que as informações de IdOrigemAcordos eram inseridas na tabela, para garantir uma boa performance nas jobs.
 
 */
 
@@ -73,7 +75,8 @@ Create table #Acordos (
 	Proposta char(1),
 	DataAprovacaoProposta datetime,
 	IdStatusAcordo int,
-	DataCancelamento datetime
+	DataCancelamento datetime,
+	IdOrigemAcordo char(2)
 );
 
 --- | Usuarios
@@ -82,14 +85,6 @@ If Object_id('Tempdb..#Usuarios') Is not null Drop table #Usuarios;
 Create table #Usuarios (
 	IdUsuario int,
 	Referencia varchar(32)
-);
-
---- | Origem
-
-If Object_id('Tempdb..#Origem') Is not null Drop table #Origem;
-Create table #Origem (
-	IdAcordo int,
-	IdOrigemAcordo char(2)
 );
 
 --- | Acordos final
@@ -133,7 +128,7 @@ Select
 	IdTitulo
 From dbDataDwItau.itau.Base360 With(nolock)
 Where 
-	Data >= Convert(date, Dateadd(day, -5, Getdate()))
+	Data >= Convert(date, Getdate())
 
 --- | Acordos
 
@@ -150,8 +145,9 @@ Insert into #Acordos (
 					  Proposta,
 					  DataAprovacaoProposta,
 					  IdStatusAcordo,
-					  DataCancelamento
-					  )
+					  DataCancelamento,
+					  IdOrigemAcordo
+					 )
 Select
 	*
 From openquery (misitau,'
@@ -168,10 +164,12 @@ Select distinct
 	a.Proposta,
 	a.DataAprovacaoProposta,
 	a.IdStatusAcordo,
-	a.DataCancelamento
+	a.DataCancelamento,
+	d.IdOrigemAcordo
 From misitau.dbo.Acordos a With(nolock)
 inner join misitau.dbo.AcordosParcelasNegociadas b With(nolock) on a.IdAcordo = b.IdAcordo
 inner join misitau.dbo.AcordosParcelasPagar c With(nolock) on a.IdAcordo = c.IdAcordo
+Left join misitau.dbo.OrigemAcordos d With(nolock) on a.IdAcordo = d.IdAcordo
 Where
 	a.DataInclusao >= Convert(date,Dateadd(hour,-3,Getdate())) 
 	or a.DataCancelamento >= Convert(date,Dateadd(hour,-3,Getdate()))
@@ -190,20 +188,6 @@ Select
 	IdUsuario,
 	Referencia
 From misitau.dbo.Usuarios With(nolock);');
-
---- | Origem
-
-Insert into #Origem (
-					 IdAcordo,
-					 IdOrigemAcordo
-					)
-Select
-	*
-From openquery (misitau,'
-Select 
-	IdAcordo,
-	IdOrigemAcordo
-From misitau.dbo.OrigemAcordos With(nolock);') ;
 
 --- | Acordos final
 
@@ -240,13 +224,12 @@ Select
 	a.DataAprovacaoProposta,
 	a.IdStatusAcordo,
 	a.DataCancelamento,
-	d.IdOrigemAcordo,
+	a.IdOrigemAcordo,
 	c.Referencia
 From #Acordos a With(nolock)
 Inner join #Base b With(nolock) on a.IdDevedor = b.IdDevedor
 								   and a.IdTitulo = b.IdTitulo
 Inner join #Usuarios c With(nolock) on a.IdNegociadorResponsavel = c.IdUsuario
-Left join #Origem d With(nolock) on a.IdAcordo = d.IdAcordo
 
 Set @LinhasOrigem = @@RowCount;
 
@@ -317,6 +300,8 @@ Set @LinhasInseridas = @@RowCount;
 Set @Etapa = 'Atualizacao de dados';
 
 --- | Atualiza campos da tabela fisica
+
+/* Atualiza a Proposta e Cancelamento */
 
 Update a
 Set a.Proposta = b.Proposta,

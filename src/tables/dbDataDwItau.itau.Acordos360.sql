@@ -1,7 +1,7 @@
 Create table dbDataDwItau.itau.Acordos360 (
-	IdAcordos int identity constraint PkAcordos primary key clustered,
+	IdAcordos int identity PkAcordos primary key clustered,
 	IdBase int,
-	Data datetime,
+	Data datetime.
 	IdDevedor int,
 	IdTitulo int,
 	Plano smallint,
@@ -10,10 +10,10 @@ Create table dbDataDwItau.itau.Acordos360 (
 	IdAcordo int,
 	IdTipoAcordo smallint,
 	DataInclusao datetime,
-	Proposta char,
+	Proposta char(1),
 	DataAprovacaoProposta datetime,
 	IdStatusAcordo int,
 	DataCancelamento datetime,
 	IdOrigemAcordo char,
-	Referencia varchar
+	Referencia varchar(32)
 );
