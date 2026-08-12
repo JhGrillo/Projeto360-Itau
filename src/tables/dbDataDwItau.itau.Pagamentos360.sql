@@ -9,7 +9,7 @@ Create table dbDataDwItau.itau.Pagamentos360 (
 	ValorPago money,
 	Valor money,
 	Referencia varchar(32),
-	TipoAcordo varchar(32),
+	TipoAcordo int,
 	DataCancelamento datetime,
 	IdOrigemAcordo char(1)
 );
