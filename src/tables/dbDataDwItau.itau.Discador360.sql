@@ -1,5 +1,5 @@
 Create table dbDataDwItau.itau.Discador360 (
-	IdCRM int identity(1,1) constraint PkCRM360 primary key,
+	IdDiscador int identity(1,1) constraint PKDiscador360 primary key,
 	IdBase int,
 	Data datetime,
 	IdDevedor int,
