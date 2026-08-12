@@ -1,4 +1,4 @@
-Create or alter Procedure itau.ProcPagamentos360 as
+Create or alter procedure itau.ProcPagamentos360 as 
 
 ------------------------------> Descrição da procedure
 
@@ -60,6 +60,7 @@ Create table #Base (
 
 if object_id('Tempdb..#Pagamentos') Is not null Drop Table #Pagamentos;
 Create table #Pagamentos (
+	Data datetime,
 	IdDevedor int,
 	IdAcordo int,
 	IdTitulo int,
@@ -102,7 +103,7 @@ Create table #PagamentosFinal (
 
 Set @Etapa = 'Carga das tabelas temporarias';
 
-Set @DataPagamento = (Select Min(DataPagamento) From misitau.misitau.dbo.AcordosParcelasPagar With(nolock))
+Set @DataPagamento = (Select Min(DataPagamento) From misitau.misitau.dbo.AcordosParcelasPagar With(nolock));
 
 --- | Base
 
@@ -124,6 +125,7 @@ Where
 --- | Pagamentos
 
 Insert into #Pagamentos (
+						 Data,
 						 IdDevedor,
 						 IdAcordo,
 						 IdTitulo,
@@ -136,6 +138,7 @@ Insert into #Pagamentos (
 						 IdOrigemAcordo
 						)
 Select
+	b.DataPagamento,
 	a.IdDevedor,
 	a.IdAcordo,
 	c.IdTitulo,
@@ -151,8 +154,7 @@ inner join misitau.misitau.dbo.AcordosParcelasPagar b With(nolock) on a.IdAcordo
 inner join misitau.misitau.dbo.AcordosParcelasNegociadas c With(nolock) on a.IdAcordo = c.IdAcordo
 Left Join misitau.misitau.dbo.OrigemAcordos d With(nolock) on a.IdAcordo = d.IdAcordo
 Where
-	b.DataPagamento >= @DataPagamento
-	or a.DataCancelamento >= Convert(date, Getdate());
+	b.DataPagamento >= @DataPagamento;
 
 --- | Usuarios
 
@@ -200,6 +202,7 @@ Select
 From #Base a
 inner join #Pagamentos b on a.IdDevedor = b.IdDevedor
 							and a.IdTitulo = b.IdTitulo
+							and a.Data = b.Data
 inner join #Usuarios c on b.IdNegociadorResponsavel = c.IdUsuario
 
 Set @LinhasOrigem = @@RowCount;
