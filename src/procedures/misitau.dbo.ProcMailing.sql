@@ -1,4 +1,4 @@
-Create or Alter Procedure dbo.ProcMailing as
+Create or Alter procedure dbo.ProcMailing as
 
 ------------------------------> Descrição da procedure
 
@@ -7,11 +7,12 @@ Create or Alter Procedure dbo.ProcMailing as
     Nome: ProcAcordosParcelasPagar
     DataCriação: 03/08/2026
     Criado por: Leonardo Matheus Talarico
-    DataAtualização: 
-    Atualizado por:
+    DataAtualização: 12/08/2026
+    Atualizado por: João Henrique Cavalheiro Grillo
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
 
+    12/08/2026 João Henrique Cavalheiro Grillo: Foi incrementado a regra de bloqueios utilizada no itau espelhando a regra da procedure de projetos.
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -71,6 +72,15 @@ Create Table #Devolucoes (
     IdCarteira int
 );
 
+--- | Ocorrências devoluções
+
+If Object_id(N'Tempdb..#OcorrenciasDevolucoes') Is not null Drop table #OcorrenciasDevolucoes;
+Create table #OcorrenciasDevolucoes (
+    IdCarteira smallint,
+    IdDevedor int,
+    Complemento varchar(256)
+);
+
 ------------------------------> Carga das tabelas temporarias
 
 Set @Etapa = 'Carga das tabelas temporarias';
@@ -100,7 +110,7 @@ With DevolucoesCTE as (
     From misitau.cob.Parcelas a
     Inner join misitau.cob.Titulos b on a.IdTitulo = b.IdTitulo
     Where
-        Convert(date, a.DataDevolucao) = Convert(date, Dateadd(hour,-3,Getdate()))
+        Convert(date, a.DataDevolucao) = Convert(date, Dateadd(hour,-3,Getdate()-1))
 ),
 
 AtivosCTE as (
@@ -127,6 +137,61 @@ Where
                 Where
                     a.IdCarteira = b.IdCarteira
                     and a.IdDevedor = b.IdDevedor);
+
+--- | Ocorrências
+
+With OcorrenciasCTE as (
+    Select distinct
+        b.IdCarteira,
+        a.IdDevedor,
+        'Colchão' as Complemento
+    From misitau.oco.Ocorrencias a
+    Inner join misitau.cob.Titulos b on a.IdTitulo = b.IdTitulo
+    Where
+        a.DataOcorrencia = Convert(date, Dateadd(hour,-3,Getdate()-1))
+        and a.IdTipoOcorrencia = 350
+        and b.IdProduto = 9
+    union
+    Select distinct
+        Convert(int,null) as IdCarteira,
+        IdDevedor,
+        Complemento
+    From misitau.oco.Ocorrencias a
+    Where
+        DataOcorrencia > Convert(date, Dateadd(hour,-3,Getdate()-1))
+        and IdTipoOcorrencia in (350)
+    union
+    Select distinct
+        Convert(int,null) as IdCarteira,
+        a.IdDevedor,
+        'Remessa' as Complemento
+    From misitau.cli.PromessaPagamento a
+    Where
+        a.DataVencimento > Convert(date, Dateadd(hour,-3,Getdate()-1))
+)
+
+Insert into #OcorrenciasDevolucoes (
+                                    IdCarteira,
+                                    IdDevedor,
+                                    Complemento
+                                    )
+Select
+    IdCarteira,
+    IdDevedor,
+    Complemento
+From OcorrenciasCTE;
+
+Insert into #Devolucoes (
+                        IdCarteira,
+                        IdDevedor
+                        )
+Select
+    IdCarteira,
+    IdDevedor
+From #OcorrenciasDevolucoes
+Where
+    Complemento in ('Colchão','Remessa')
+    or Complemento like '%BAIXA PGTO DO / DT PGTO%';
 
 --- | Mailing
 
@@ -196,7 +261,7 @@ Where
     Exists (Select 1
             From #Devolucoes b
             Where
-                a.IdCarteira = b.IdCarteira
+                Isnull(a.IdCarteira,b.IdCarteira) = b.IdCarteira
                 and a.IdDevedor = b.IdDevedor);
 
 Set @LinhasAtualizadas = @@RowCount;
@@ -208,7 +273,7 @@ WHere
     Not Exists (Select 1
                 From #DadosOrigem b
                 Where
-                    a.IdCarteira = b.IdCarteira
+                    Isnull(a.IdCarteira,b.IdCarteira) = b.IdCarteira
                     and a.IdDevedor = b.IdDevedor);
 
 Set @LinhasAtualizadas += @@RowCount;
