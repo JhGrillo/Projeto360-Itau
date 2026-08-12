@@ -21,6 +21,7 @@ Set Nocount On;
 Declare @NomeProcedure varchar(128) = 'ProcPagamentos360',
         @Etapa varchar(100) = 'Inicio',
         @IdExecucao int,
+		@DataPagamento datetime,
         @LinhasOrigem int,
         @LinhasInseridas int,
         @LinhasAtualizadas int,
@@ -101,6 +102,8 @@ Create table #PagamentosFinal (
 
 Set @Etapa = 'Carga das tabelas temporarias';
 
+Set @DataPagamento = (Select Min(DataPagamento) From misitau.misitau.dbo.AcordosParcelasPagar With(nolock))
+
 --- | Base
 
 Insert into #Base (
@@ -116,7 +119,7 @@ Select
 	IdTitulo
 From dbDataDwItau.itau.Base360 With(nolock)
 Where
-	Data >= Convert(date, Getdate())
+	Data >= @DataPagamento
 
 --- | Pagamentos
 
@@ -133,9 +136,6 @@ Insert into #Pagamentos (
 						 IdOrigemAcordo
 						)
 Select
-	*
-From openquery (misitau,'
-Select
 	a.IdDevedor,
 	a.IdAcordo,
 	c.IdTitulo,
@@ -146,13 +146,13 @@ Select
 	a.IdTipoAcordo,
 	a.DataCancelamento,
 	d.IdOrigemAcordo
-From misitau.dbo.Acordos a With(nolock)
-inner join misitau.dbo.AcordosParcelasPagar b With(nolock) on a.IdAcordo = b.IdAcordo
-inner join misitau.dbo.AcordosParcelasNegociadas c With(nolock) on a.IdAcordo = c.IdAcordo
-Left Join misitau.dbo.OrigemAcordos d With(nolock) on a.IdAcordo = d.IdAcordo
+From misitau.misitau.dbo.Acordos a With(nolock)
+inner join misitau.misitau.dbo.AcordosParcelasPagar b With(nolock) on a.IdAcordo = b.IdAcordo
+inner join misitau.misitau.dbo.AcordosParcelasNegociadas c With(nolock) on a.IdAcordo = c.IdAcordo
+Left Join misitau.misitau.dbo.OrigemAcordos d With(nolock) on a.IdAcordo = d.IdAcordo
 Where
-	b.DataPagamento >= Convert(date, Getdate()-5)
-	or a.DataCancelamento >= Convert(date, Getdate());');
+	b.DataPagamento >= @DataPagamento
+	or a.DataCancelamento >= Convert(date, Getdate());
 
 --- | Usuarios
 
