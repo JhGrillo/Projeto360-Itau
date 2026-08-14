@@ -20,7 +20,6 @@ Create table dbDataDwItau.itau.Base360 (
 	Risco money,
 	SaldoVencido money,
 	ValorRegularizacao money,
-	AreaNegocio varchar(2),
 	FaixaValor varchar(32),
 	IdRetirada int,
 );
