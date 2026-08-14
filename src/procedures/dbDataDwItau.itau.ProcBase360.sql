@@ -1,4 +1,4 @@
-Create or alter procedure itau.ProcBase360 as
+Create or Alter procedure itau.ProcBase360 as
 
 ------------------------------> Descrição da procedure
 
@@ -7,10 +7,13 @@ Create or alter procedure itau.ProcBase360 as
     Nome: ProcBase360
     DataCriação: 06/08/2026
     Criado por: Leonardo Matheus Talarico
-    DataAtualização:
-    Atualizado por:
+    DataAtualização: 14/08/2026
+    Atualizado por: João Henrique Cavalheiro Grillo
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+	14/08/2026 João Henrique Cavalheiro Grillo: Refatorado o processo para melhoria de performance e elegibilidade de código, agora todas as tratativas são realizadas diretamento em cross aply,
+	economizando o custo da consulta ao inves de realizar diversos updates ao longo da procedure.
 
 */
 
@@ -69,7 +72,6 @@ Create table #Base360 (
 	Risco money,
 	SaldoVencido money,
 	ValorRegularizacao money,
-	AreaNegocio varchar(2),
 	FaixaValor varchar(32),
 	IdRetirada int
 );
@@ -80,11 +82,13 @@ Set @Etapa = 'Carga das tabelas temporarias';
 
 --- | Base360
 
+
 Insert into #Base360 (
 					Data,
 					CodigoReferencia,
 					Carteira,
 					Produto,
+					SubProduto,
 					Cluster,
 					IdDevedor,
 					CnpjCpf,
@@ -95,19 +99,19 @@ Insert into #Base360 (
 					NumeroParcela,
 					DataInclusao,
 					DataVencimento,
+					DiasEmAtraso,
+					FaixaAtraso,
 					Risco,
 					SaldoVencido,
 					ValorRegularizacao,
-					AreaNegocio
+					FaixaValor
 				   )
 Select
-	*
-From openquery (misitau, '
-Select
-	Convert(date,Getdate()) as Data,
+	Convert(date,@DataHoraInicio) as Data,
 	CodigoReferencia,
 	Carteira,
 	Produto,
+	SubProduto,
 	Cluster,
 	IdDevedor,
 	CnpjCpf,
@@ -118,85 +122,67 @@ Select
 	NumeroParcela,
 	DataInclusao,
 	DataVencimento,
+	DiasEmAtraso,
+	FaixaAtraso,
 	Risco,
 	SaldoVencido,
 	ValorRegularizacao,
-	AreaNegocio
-From misitau.dbo.Base With(nolock);');
+	FaixaValor
+From misitau.misitau.dbo.Base a With(nolock)
+Cross Apply (Select
+				Case
+					When AreaNegocio in ('02', '2', '11') then 'NCOR'
+					When AreaNegocio in ('01', '1')		  then 'BPF'
+				end as SubProduto,
+				Datediff(day,DataVencimento,@DataHoraInicio) as DiasEmAtraso,
+				Case 
+					When Coalesce(ValorRegularizacao, Risco) <= 500		then '01. 0 a 500'
+					When Coalesce(ValorRegularizacao, Risco) <= 1000	then '02. 501 a 1000'
+					When Coalesce(ValorRegularizacao, Risco) <= 2000	then '03. 1001 a 2000'
+					When Coalesce(ValorRegularizacao, Risco) <= 5000	then '04. 2001 a 5000'
+					When Coalesce(ValorRegularizacao, Risco) <= 7000	then '05. 5001 a 7000'
+					When Coalesce(ValorRegularizacao, Risco) <= 20000	then '06. 7001 a 20000'
+					When Coalesce(ValorRegularizacao, Risco) <= 80000	then '07. 20000 a 80000'
+					When Coalesce(ValorRegularizacao, Risco) > 80000	then '08. Acima de 80000'
+					else '00. Sem faixa'
+				end as FaixaValor
+			) as CalculosA
+Cross Apply (Select
+				Case 
+					When SubProduto = 'NCOR' then
+						Case
+							When DiasEmAtraso <= 90		then '01. Menor que 91'
+							When DiasEmAtraso <= 180	then '02. 91 a 180'
+							When DiasEmAtraso <= 360	then '03. 181 a 360'
+							When DiasEmAtraso <= 720	then '04. 361 a 720'
+							When DiasEmAtraso <= 1200	then '05. 721 a 1200'
+							When DiasEmAtraso <= 1500	then '06. 1201 a 1500'
+							When DiasEmAtraso <= 1800	then '07. 1501 a 1800'
+							When DiasEmAtraso <= 2300	then '08. 1801 a 2300'
+							When DiasEmAtraso > 2300	then '09. Acima de 2300'
+							else '00. Sem faixa'
+						end
+					When SubProduto = 'BPF' then
+						Case
+							When DiasEmAtraso < 5		then '00. Sem faixa'
+							When DiasEmAtraso <= 30		then '01. 5 a 30'
+							When DiasEmAtraso <= 60		then '02. 31 a 60'
+							When DiasEmAtraso <= 90		then '03. 61 a 90'
+							When DiasEmAtraso <= 180	then '04. 91 a 180'
+							When DiasEmAtraso <= 360	then '05. 181 a 360'
+							When DiasEmAtraso <= 720	then '06. 361 a 720'
+							When DiasEmAtraso <= 1200	then '07. 721 a 1200'
+							When DiasEmAtraso <= 1500	then '08. 1201 a 1500'
+							When DiasEmAtraso <= 1800	then '09. 1501 a 1800'
+							When DiasEmAtraso <= 2300	then '10. 1801 a 2300'
+							When DiasEmAtraso > 2300	then '11. Acima de 2300'
+							else '00. Sem faixa'
+						end
+					else '00. Sem faixa'
+				end as FaixaAtraso
+			) as CalculosB;
 
 Set @LinhasOrigem = @@RowCount;
-
-------------------------------> Etapa de calculo
-
-Set @Etapa = 'Etapa de calculo';
-
---- | Subproduto
-
-Update a
-Set a.SubProduto = Case
-						When a.AreaNegocio in ('02', '2', '11') then 'NCOR'
-						When a.AreaNegocio in ('01', '1')		then 'BPF'
-					end
-From #Base360 a;
-
---- | Dias em atraso
-
-Update a
-Set a.DiasEmAtraso = Datediff(day,a.DataVencimento,Getdate())
-From #Base360 a;
-
---- | Faixa de atraso
-
-Update a
-Set a.FaixaAtraso = Case 
-						When a.SubProduto = 'NCOR' then
-							Case
-								When a.DiasEmAtraso <= 90	then '01. Menor que 91'
-								When a.DiasEmAtraso <= 180	then '02. 91 a 180'
-								When a.DiasEmAtraso <= 360	then '03. 181 a 360'
-								When a.DiasEmAtraso <= 720	then '04. 361 a 720'
-								When a.DiasEmAtraso <= 1200	then '05. 721 a 1200'
-								When a.DiasEmAtraso <= 1500	then '06. 1201 a 1500'
-								When a.DiasEmAtraso <= 1800	then '07. 1501 a 1800'
-								When a.DiasEmAtraso <= 2300	then '08. 1801 a 2300'
-								When a.DiasEmAtraso > 2300	then '09. Acima de 2300'
-								else '00. Sem faixa'
-							end
-						When a.SubProduto = 'BPF' then
-							Case
-								When a.DiasEmAtraso < 5		then '00. Sem faixa'
-								When a.DiasEmAtraso <= 30	then '01. 5 a 30'
-								When a.DiasEmAtraso <= 60	then '02. 31 a 60'
-								When a.DiasEmAtraso <= 90	then '03. 61 a 90'
-								When a.DiasEmAtraso <= 180	then '04. 91 a 180'
-								When a.DiasEmAtraso <= 360	then '05. 181 a 360'
-								When a.DiasEmAtraso <= 720	then '06. 361 a 720'
-								When a.DiasEmAtraso <= 1200	then '07. 721 a 1200'
-								When a.DiasEmAtraso <= 1500	then '08. 1201 a 1500'
-								When a.DiasEmAtraso <= 1800	then '09. 1501 a 1800'
-								When a.DiasEmAtraso <= 2300	then '10. 1801 a 2300'
-								When a.DiasEmAtraso > 2300	then '11. Acima de 2300'
-								else '00. Sem faixa'
-							end
-						else '00. Sem faixa'
-					end
-From #Base360 a;
-
---- | Faixa de valor
-
-Update a
-Set a.FaixaValor = Case 
-						When Coalesce(a.ValorRegularizacao, a.Risco) <= 500		then '01. 0 a 500'
-						When Coalesce(a.ValorRegularizacao, a.Risco) <= 1000	then '02. 501 a 1000'
-						When Coalesce(a.ValorRegularizacao, a.Risco) <= 2000	then '03. 1001 a 2000'
-						When Coalesce(a.ValorRegularizacao, a.Risco) <= 5000	then '04. 2001 a 5000'
-						When Coalesce(a.ValorRegularizacao, a.Risco) <= 7000	then '05. 5001 a 7000'
-						When Coalesce(a.ValorRegularizacao, a.Risco) <= 20000	then '06. 7001 a 20000'
-						When Coalesce(a.ValorRegularizacao, a.Risco) <= 80000	then '07. 20000 a 80000'
-						When Coalesce(a.ValorRegularizacao, a.Risco) > 80000	then '08. Acima de 80000'
-						else '00. Sem faixa'
-					end
-From #Base360 a;
 
 ------------------------------> Criação de indices
 
@@ -216,6 +202,7 @@ Insert into dbDataDwItau.itau.Base360 (
 									   CodigoReferencia,
 									   Carteira,
 									   Produto,
+									   SubProduto,
 									   Cluster,
 									   IdDevedor,
 									   CnpjCpf,
@@ -228,14 +215,14 @@ Insert into dbDataDwItau.itau.Base360 (
 									   DataVencimento,
 									   Risco,
 									   SaldoVencido,
-									   ValorRegularizacao,
-									   AreaNegocio
+									   ValorRegularizacao
 									   )
 Select
 	Data,
 	CodigoReferencia,
 	Carteira,
 	Produto,
+	SubProduto,
 	Cluster,
 	IdDevedor,
 	CnpjCpf,
@@ -248,8 +235,7 @@ Select
 	DataVencimento,
 	Risco,
 	SaldoVencido,
-	ValorRegularizacao,
-	AreaNegocio
+	ValorRegularizacao
 From #Base360 a With(nolock)
 Where
 	Not exists (Select 1
@@ -299,13 +285,13 @@ Set @LinhasAtualizadas = @@RowCount;
 Update a
 Set a.IdRetirada = 1
 From dbDataDwItau.itau.Base360 a With(nolock)
+Left join #Base360 b on a.IdDevedor = b.IdDevedor
+					    and a.IdTitulo = b.IdTitulo
+						and a.Data = b.Data
 Where
-	Not Exists (Select 1
-				From #Base360 b
-				Where 
-					a.IdDevedor = b.IdDevedor
-					and a.IdTitulo = b.IdTitulo
-					and a.Data = b.Data)
+	a.Data >= Convert(date,Getdate())
+	and b.IdDevedor is null
+	and a.IdRetirada is null;
 
 Set @LinhasAtualizadas += @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + isnull(@LinhasAtualizadas, 0);
@@ -315,7 +301,6 @@ Set @DataHoraFim = Getdate();
 Exec dbDataDwItau.[log].ProcControles
     @TipoLog = 'Volumetria',
     @IdExecucao = @IdExecucao,
-    @NomeTabelaOrigem = 'dbo.Base',
     @NomeTabelaDestino = 'dbo.Base360',
     @LinhasOrigem = @LinhasOrigem,
     @LinhasInseridas = @LinhasInseridas,
@@ -337,7 +322,7 @@ Set @NumeroErro = Error_number();
 Set @LinhaErro = Error_line();
 
 /* Finalizacao execução de log erro */
-Set @DataHoraFim = Dateadd(hour,-3,Getdate());
+Set @DataHoraFim = Getdate();
 Exec dbDataDwItau.[log].ProcControles
     @TipoLog = 'Atualizacao',
     @IdExecucao = @IdExecucao,
