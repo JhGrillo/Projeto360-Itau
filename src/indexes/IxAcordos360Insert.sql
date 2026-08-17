@@ -1,0 +1,1 @@
+Create nonclustered index IxAcordos360Insert on dbDataDwItau.itau.Acordos360 (IdBase, IdAcordo, NumeroParcela);
