@@ -1,4 +1,4 @@
-Create or alter Procedure itau.ProcAcordos360 as
+Create or Alter procedure itau.ProcAcordos360 as
 
 ------------------------------> Descrição da procedure
 
@@ -7,13 +7,15 @@ Create or alter Procedure itau.ProcAcordos360 as
 	Nome: ProcAcordos360
 	DataCriação: 07/08/2026
 	Criado por: Leonardo Matheus Talarico
-	DataAtualização: 12/08/2026
-	Atualizado por: Leonardo Matheus Talarico
+	DataAtualização: 17/08/2026
+	Atualizado por: João Henrique Cavalheiro Grillo
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
 
 	12/08/2026 Leonardo Matheus Talarico: Foi atualizado a forma que as informações de IdOrigemAcordos eram inseridas na tabela, para garantir uma boa performance nas jobs.
 
+	17/08/2026 João Henrique Cavalheiro Grillo: Realizado o refatoramento da procedure, consolidando no carregamento dos dados as informações, e retirando updates que estava prejudicando
+	o tempo de execução.
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -64,27 +66,19 @@ Create table #Base (
 If Object_id('Tempdb..#Acordos') Is not null Drop table #Acordos;
 Create table #Acordos (
 	IdAcordo int,
-	IdTipoAcordo smallint,
+	TipoAcordo varchar(32),
 	IdDevedor int,
 	IdTitulo int,
 	Plano int,
 	NumeroParcela int,
 	Valor money,
-	IdNegociadorResponsavel int,
+	Referencia varchar(64),
 	DataInclusao datetime,
 	Proposta char(1),
 	DataAprovacaoProposta datetime,
-	IdStatusAcordo int,
+	StatusAcordo varchar(64),
 	DataCancelamento datetime,
 	IdOrigemAcordo char(2)
-);
-
---- | Usuarios
-
-If Object_id('Tempdb..#Usuarios') Is not null Drop table #Usuarios;
-Create table #Usuarios (
-	IdUsuario int,
-	Referencia varchar(32)
 );
 
 --- | Acordos final
@@ -92,21 +86,20 @@ Create table #Usuarios (
 If Object_id('Tempdb..#AcordosFinal') Is not null Drop table #AcordosFinal;
 Create table #AcordosFinal (
 	IdBase int,
-	Data datetime,
+	IdAcordo int,
+	TipoAcordo varchar(32),
 	IdDevedor int,
 	IdTitulo int,
-	Plano smallint,
-	NumeroParcela smallint,
+	Plano int,
+	NumeroParcela int,
 	Valor money,
-	IdAcordo int,
-	IdTipoAcordo smallint,
+	Referencia varchar(64),
 	DataInclusao datetime,
 	Proposta char(1),
 	DataAprovacaoProposta datetime,
-	IdStatusAcordo int,
+	StatusAcordo varchar(64),
 	DataCancelamento datetime,
-	IdOrigemAcordo char(2),
-	Referencia varchar(32)
+	IdOrigemAcordo char(2)
 );
 
 ------------------------------> Carga das tabelas temporarias
@@ -128,108 +121,92 @@ Select
 	IdTitulo
 From dbDataDwItau.itau.Base360 With(nolock)
 Where 
-	Data >= Convert(date, Getdate())
+	Data >= Convert(date, Getdate());
 
 --- | Acordos
 
 Insert into #Acordos (
 					  IdAcordo,
-					  IdTipoAcordo,
+					  TipoAcordo,
 					  IdDevedor,
 					  IdTitulo,
 					  Plano,
 					  NumeroParcela,
 					  Valor,
-					  IdNegociadorResponsavel,
+					  Referencia,
 					  DataInclusao,
 					  Proposta,
 					  DataAprovacaoProposta,
-					  IdStatusAcordo,
+					  StatusAcordo,
 					  DataCancelamento,
 					  IdOrigemAcordo
 					 )
-Select
-	*
-From openquery (misitau,'
 Select distinct
 	a.IdAcordo,
-	a.IdTipoAcordo,
+	b.TipoAcordo,
 	a.IdDevedor,
-	b.IdTitulo,
+	c.IdTitulo,
 	a.Plano,
-	c.NumeroParcela,
-	c.Valor,
-	a.IdNegociadorResponsavel,
+	d.NumeroParcela,
+	d.Valor,
+	e.Referencia,
 	a.DataInclusao,
 	a.Proposta,
 	a.DataAprovacaoProposta,
-	a.IdStatusAcordo,
+	f.StatusAcordo,
 	a.DataCancelamento,
-	d.IdOrigemAcordo
-From misitau.dbo.Acordos a With(nolock)
-inner join misitau.dbo.AcordosParcelasNegociadas b With(nolock) on a.IdAcordo = b.IdAcordo
-inner join misitau.dbo.AcordosParcelasPagar c With(nolock) on a.IdAcordo = c.IdAcordo
-Left join misitau.dbo.OrigemAcordos d With(nolock) on a.IdAcordo = d.IdAcordo
+	g.IdOrigemAcordo
+From misitau.misitau.dbo.Acordos a With(nolock)
+Inner join misitau.misitau.dbo.TiposAcordos b With(nolock) on a.IdTipoAcordo = b.IdTipoAcordo
+Inner join misitau.misitau.dbo.AcordosParcelasNegociadas c With(nolock) on a.IdAcordo = c.IdAcordo
+Inner join misitau.misitau.dbo.AcordosParcelasPagar d With(nolock) on a.IdAcordo = d.IdAcordo
+Inner join misitau.misitau.dbo.Usuarios e With(nolock) on a.IdNegociadorResponsavel = e.IdUsuario
+Inner join misitau.misitau.dbo.StatusAcordos f With(nolock) on a.IdStatusAcordo = f.IdStatusAcordo
+Inner join misitau.misitau.dbo.OrigemAcordos g With(nolock) on a.IdAcordo = g.IdAcordo
 Where
-	a.DataInclusao >= Convert(date,Dateadd(hour,-3,Getdate())) 
-	or a.DataCancelamento >= Convert(date,Dateadd(hour,-3,Getdate()))
-	or a.DataAprovacaoProposta >= Convert(date, Dateadd(hour,-3,Getdate()));');
-
---- Usuarios
-	
-Insert into #Usuarios (
-						IdUsuario,
-						Referencia
-					   )
-Select
-	*
-From openquery (misitau,'
-Select
-	IdUsuario,
-	Referencia
-From misitau.dbo.Usuarios With(nolock);');
+	a.DataInclusao >= Convert(date,Getdate())
+	or a.DataCancelamento >= Convert(date,Getdate())
+	or a.DataAprovacaoProposta >= Convert(date,Getdate());
 
 --- | Acordos final
 
 Insert into #AcordosFinal (
 						IdBase,
-						Data,
+						IdAcordo,
+						TipoAcordo,
 						IdDevedor,
 						IdTitulo,
 						Plano,
 						NumeroParcela,
 						Valor,
-						IdAcordo,
-						IdTipoAcordo,
+						Referencia,
 						DataInclusao,
 						Proposta,
 						DataAprovacaoProposta,
-						IdStatusAcordo,
+						StatusAcordo,
 						DataCancelamento,
-						IdOrigemAcordo,
-						Referencia
+						IdOrigemAcordo
 						)
 Select
 	b.IdBase,
-	b.Data,
-	b.IdDevedor,
-	b.IdTitulo,
+	a.IdAcordo,
+	a.TipoAcordo,
+	a.IdDevedor,
+	a.IdTitulo,
 	a.Plano,
 	a.NumeroParcela,
 	a.Valor,
-	a.IdAcordo,
-	a.IdTipoAcordo,
+	a.Referencia,
 	a.DataInclusao,
 	a.Proposta,
 	a.DataAprovacaoProposta,
-	a.IdStatusAcordo,
+	a.StatusAcordo,
 	a.DataCancelamento,
-	a.IdOrigemAcordo,
-	c.Referencia
+	a.IdOrigemAcordo
 From #Acordos a With(nolock)
 Inner join #Base b With(nolock) on a.IdDevedor = b.IdDevedor
 								   and a.IdTitulo = b.IdTitulo
-Inner join #Usuarios c With(nolock) on a.IdNegociadorResponsavel = c.IdUsuario
+								   and Convert(date,a.DataInclusao) = b.Data;
 
 Set @LinhasOrigem = @@RowCount;
 
@@ -238,7 +215,7 @@ Set @LinhasOrigem = @@RowCount;
 Set @Etapa = 'Criacao de indices';
 
 /* Cria index não clusterizado */
-Create nonclustered index IxAcordos360 on #AcordosFinal (IdBase, IdAcordo, IdDevedor, IdTitulo, NumeroParcela);
+Create nonclustered index IxAcordos360 on #AcordosFinal (IdBase, IdAcordo, NumeroParcela);
 
 ------------------------------> Persistencia final
 
@@ -247,51 +224,46 @@ Set @Etapa = 'Persistencia final';
 --- | Tabela fisica
 
 Insert into dbDataDwItau.itau.Acordos360 (
-										  IdBase,
-										  Data,
-										  IdDevedor,
-										  IdTitulo,
-										  Plano,
-										  NumeroParcela,
-										  Valor,
-										  IdAcordo,
-										  IdTipoAcordo,
-										  DataInclusao,
-										  Proposta,
-										  DataAprovacaoProposta,
-										  IdStatusAcordo,
-										  DataCancelamento,
-										  IdOrigemAcordo,
-										  Referencia
+										IdBase,
+										IdAcordo,
+										TipoAcordo,
+										IdDevedor,
+										IdTitulo,
+										Plano,
+										NumeroParcela,
+										Valor,
+										Referencia,
+										DataInclusao,
+										Proposta,
+										DataAprovacaoProposta,
+										StatusAcordo,
+										DataCancelamento,
+										IdOrigemAcordo
 										 )
 Select 
 	IdBase,
-	Data,
+	IdAcordo,
+	TipoAcordo,
 	IdDevedor,
 	IdTitulo,
 	Plano,
 	NumeroParcela,
 	Valor,
-	IdAcordo,
-	IdTipoAcordo,
+	Referencia,
 	DataInclusao,
 	Proposta,
 	DataAprovacaoProposta,
-	IdStatusAcordo,
+	StatusAcordo,
 	DataCancelamento,
-	IdOrigemAcordo,
-	Referencia
-From
-	#AcordosFinal a
+	IdOrigemAcordo
+From #AcordosFinal a
 Where 
 	Not exists (Select 1
-				From dbDataDwItau.itau.Acordos360 b
+				From dbDataDwItau.itau.Acordos360 b With(nolock)
 				Where 
 					a.IdBase = b.IdBase
 					and a.IdAcordo = b.IdAcordo
-					and a.IdDevedor = b.IdTitulo
-					and a.NumeroParcela = b.NumeroParcela
-					and a.Data = b.Data)
+					and a.NumeroParcela = b.NumeroParcela);
 
 Set @LinhasInseridas = @@RowCount;
 
@@ -306,14 +278,15 @@ Set @Etapa = 'Atualizacao de dados';
 Update a
 Set a.Proposta = b.Proposta,
 	a.DataAprovacaoProposta = b.DataAprovacaoProposta,
+	a.StatusAcordo = b.StatusAcordo,
 	a.DataCancelamento = b.DataCancelamento
 From dbDataDwItau.itau.Acordos360 a With(nolock)
-Inner join #AcordosFinal b With(nolock) on a.IdAcordo = b.IdAcordo
-										 and a.IdDevedor = b.IdDevedor
-										 and a.Data = b.Data
+Inner join #AcordosFinal b With(nolock) on a.IdBase = b.IdBase
+										   and a.IdAcordo = b.IdAcordo
+										   and a.NumeroParcela = b.NumeroParcela
 Where
 	Isnull(a.DataAprovacaoProposta,'1900-01-01') <> Isnull(b.DataAprovacaoProposta,'1900-01-01')
-	or a.IdStatusAcordo <> b.IdStatusAcordo
+	or a.StatusAcordo <> b.StatusAcordo
 	or Isnull(a.DataCancelamento,'1900-01-01') <> Isnull(b.DataCancelamento,'1900-01-01');
 
 Set @LinhasAtualizadas += @@RowCount;
