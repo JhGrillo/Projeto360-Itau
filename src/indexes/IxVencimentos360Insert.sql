@@ -1,0 +1,1 @@
+Create nonclustered index IxVencimentos360Insert on dbDataDwItau.itau.Vencimentos360 (IdBase, IdAcordo, NumeroParcela);

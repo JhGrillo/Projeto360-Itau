@@ -1,4 +1,4 @@
-Create or Alter Procedure itau.ProcVencimentos360 as
+Create or Alter procedure itau.ProcVencimentos360 as
 
 ------------------------------> Descrição da procedure
 
@@ -7,11 +7,13 @@ Create or Alter Procedure itau.ProcVencimentos360 as
 	Nome: ProcVencimentos360
 	DataCriação: 10/08/2026
 	Criado por: Leonardo Matheus Talarico
-	DataAtualização: 
-	Atualizado por: 
+	DataAtualização: 17/08/2026
+	Atualizado por: João Henrique Cavalheiro Grillo
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
 
+	17/08/2026 João Henrique Cavalheiro Grillo: Realizado o refatoramento da procedure, consolidando o carregamento dos dados, e retirando updates que estavam prejudicando o
+	tempo de execução.
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -62,29 +64,20 @@ Create table #Base (
 
 If Object_id('Tempdb..#Vencimentos') Is not null Drop table #Vencimentos;
 Create table #Vencimentos (
-	IdDevedor int,
-	IdNegociadorResponsavel int,
-	IdTitulo int,
 	IdAcordo int,
+	TipoAcordo varchar(32),
+	IdDevedor int,
+	IdTitulo int,
+	Plano int,
 	NumeroParcela int,
 	Valor money,
-	DataCancelamento datetime
-);
-
---- | Origem acordos
-
-If Object_id('Tempdb..#OrigemAcordos') Is not null Drop table #OrigemAcordos;
-Create table #OrigemAcordos (
-	IdAcordo int,
-	IdOrigemAcordo char(1)
-);
-
---- | Usuários
-
-If Object_id('Tempdb..#Usuarios') Is not null Drop table #Usuarios;
-Create table #Usuarios (
-	IdUsuario int,
-	Referencia varchar(32)
+	DataVencimento datetime,
+	Referencia varchar(64),
+	Proposta char(1),
+	DataAprovacaoProposta datetime,
+	StatusAcordo varchar(64),
+	DataCancelamento datetime,
+	IdOrigemAcordo char(2)
 );
 
 --- | Vencimentos final
@@ -93,14 +86,19 @@ If Object_id('Tempdb..#VencimentosFinal') Is not null Drop table #VencimentosFin
 Create table #VencimentosFinal (
 	IdBase int,
 	Data datetime,
+	IdAcordo int,
+	TipoAcordo varchar(32),
 	IdDevedor int,
 	IdTitulo int,
-	IdAcordo int,
+	Plano int,
 	NumeroParcela int,
 	Valor money,
-	Referencia varchar(32),
+	Referencia varchar(64),
+	Proposta char(1),
+	DataAprovacaoProposta datetime,
+	StatusAcordo varchar(64),
 	DataCancelamento datetime,
-	IdOrigemAcordo char(1)
+	IdOrigemAcordo char(2)
 );
 
 ------------------------------> Carga das tabelas temporarias
@@ -122,97 +120,91 @@ Select
 	IdTitulo
 From dbDataDwItau.itau.Base360 With(nolock)
 Where
-	Data Between Convert(date, Getdate()) and Getdate()
+	Data >= Convert(date,Getdate());
 
 --- | Vencimentos
 
 Insert into #Vencimentos (
-						  IdDevedor,
-						  IdNegociadorResponsavel,
-						  IdTitulo,
 						  IdAcordo,
+						  TipoAcordo,
+						  IdDevedor,
+						  IdTitulo,
+						  Plano,
 						  NumeroParcela,
 						  Valor,
-						  DataCancelamento
+						  DataVencimento,
+						  Referencia,
+						  Proposta,
+						  DataAprovacaoProposta,
+						  StatusAcordo,
+						  DataCancelamento,
+						  IdOrigemAcordo
 						  )
-Select
-	*
-From Openquery (misitau,'
 Select distinct
-	b.IdDevedor,
-	b.IdNegociadorResponsavel,
+	a.IdAcordo,
+	b.TipoAcordo,
+	a.IdDevedor,
 	c.IdTitulo,
-	b.IdAcordo,
-	a.NumeroParcela,
-	a.Valor,
-	b.DataCancelamento
-From misitau.dbo.AcordosParcelasPagar a With(nolock)
-Inner join misitau.dbo.Acordos b With(nolock) on a.IdAcordo = b.IdAcordo
-Inner join misitau.dbo.AcordosParcelasNegociadas c With(nolock) on a.IdAcordo =c.IdAcordo
+	a.Plano,
+	d.NumeroParcela,
+	d.Valor,
+	d.DataVencimento,
+	e.Referencia,
+	a.Proposta,
+	a.DataAprovacaoProposta,
+	f.StatusAcordo,
+	a.DataCancelamento,
+	g.IdOrigemAcordo
+From misitau.misitau.dbo.Acordos a With(nolock)
+Inner join misitau.misitau.dbo.TiposAcordos b With(nolock) on a.IdTipoAcordo = b.IdTipoAcordo
+Inner join misitau.misitau.dbo.AcordosParcelasNegociadas c With(nolock) on a.IdAcordo = c.IdAcordo
+Inner join misitau.misitau.dbo.AcordosParcelasPagar d With(nolock) on a.IdAcordo = d.IdAcordo
+Inner join misitau.misitau.dbo.Usuarios e With(nolock) on a.IdNegociadorResponsavel = e.IdUsuario
+Inner join misitau.misitau.dbo.StatusAcordos f With(nolock) on a.IdStatusAcordo = f.IdStatusAcordo
+Inner join misitau.misitau.dbo.OrigemAcordos g With(nolock) on a.IdAcordo = g.IdAcordo
 Where
-	DataVencimento = Dateadd(hour,-3,Getdate())
-	or Convert(date,b.DataCancelamento) = Dateadd(hour,-3,Getdate());');
-
---- | Origem Acordos
-
-Insert into #OrigemAcordos (
-							IdAcordo,
-							IdOrigemAcordo
-						    )
-Select
-	*
-From openquery (misitau,'
-Select
-	IdAcordo,
-	IdOrigemAcordo
-From
-	misitau.dbo.OrigemAcordos With(nolock);');
-
---- | Usuarios
-
-Insert into #Usuarios (
-					   IdUsuario,
-					   Referencia
-					  )
-Select
-	*
-From openquery (misitau,'
-Select
-	IdUsuario,
-	Referencia
-From
-	misitau.dbo.Usuarios With(nolock);');
+	d.DataVencimento = Convert(date,Getdate())
+	or Convert(date,a.DataCancelamento) = Convert(date,Getdate());
 
 --- | Vencimentos Final
 
 Insert into #VencimentosFinal (
-							  IdBase,
-							  Data,
-							  IdDevedor,
-							  IdTitulo,
-							  IdAcordo,
-							  NumeroParcela,
-							  Valor,
-							  Referencia,
-							  DataCancelamento,
-							  IdOrigemAcordo
+							IdBase,
+							Data,
+							IdAcordo,
+							TipoAcordo,
+							IdDevedor,
+							IdTitulo,
+							Plano,
+							NumeroParcela,
+							Valor,
+							Referencia,
+							Proposta,
+							DataAprovacaoProposta,
+							StatusAcordo,
+							DataCancelamento,
+							IdOrigemAcordo
 							  )
 Select
-	a.IdBase,
-	a.Data,
+	b.IdBase,
+	a.DataVencimento,
+	a.IdAcordo,
+	a.TipoAcordo,
 	a.IdDevedor,
 	a.IdTitulo,
-	b.IdAcordo,
-	b.NumeroParcela,
-	b.Valor,
-	c.Referencia,
-	b.DataCancelamento,
-	d.IdOrigemAcordo
-From #Base a
-inner join #Vencimentos b on a.IdDevedor = b.IdDevedor
-							 and a.IdTitulo = b.IdTitulo
-inner join #Usuarios c on b.IdNegociadorResponsavel = c.IdUsuario
-inner join #OrigemAcordos d on b.IdAcordo = d.IdAcordo
+	a.Plano,
+	a.NumeroParcela,
+	a.Valor,
+	a.Referencia,
+	a.Proposta,
+	a.DataAprovacaoProposta,
+	a.StatusAcordo,
+	a.DataCancelamento,
+	a.IdOrigemAcordo
+From #Vencimentos a
+Inner join #Base b on a.IdDevedor = b.IdDevedor
+					  and a.IdTitulo = b.IdTitulo
+					  and a.DataVencimento = b.Data;
 
 Set @LinhasOrigem = @@RowCount;
 
@@ -230,26 +222,36 @@ Set @Etapa = 'Persistencia final';
 --- | Tabela fisica
 
 Insert into dbDataDwItau.itau.Vencimentos360 (
-											  IdBase,
-											  Data,
-											  IdDevedor,
-											  IdTitulo,
-											  IdAcordo,
-											  NumeroParcela,
-											  Valor,
-											  Referencia,
-											  DataCancelamento,
-											  IdOrigemAcordo
+											IdBase,
+											Data,
+											IdAcordo,
+											TipoAcordo,
+											IdDevedor,
+											IdTitulo,
+											Plano,
+											NumeroParcela,
+											Valor,
+											Referencia,
+											Proposta,
+											DataAprovacaoProposta,
+											StatusAcordo,
+											DataCancelamento,
+											IdOrigemAcordo
 											 )
 Select
 	IdBase,
 	Data,
+	IdAcordo,
+	TipoAcordo,
 	IdDevedor,
 	IdTitulo,
-	IdAcordo,
+	Plano,
 	NumeroParcela,
 	Valor,
 	Referencia,
+	Proposta,
+	DataAprovacaoProposta,
+	StatusAcordo,
 	DataCancelamento,
 	IdOrigemAcordo
 From #VencimentosFinal a
@@ -259,10 +261,8 @@ Where
 				From dbDataDwItau.itau.Vencimentos360 b With(nolock)
 				Where 
 					a.IdBase = b.IdBase
-					and a.IdDevedor = b.IdDevedor
-					and a.IdTitulo = b.IdTitulo
 					and a.IdAcordo = b.IdAcordo
-					and a.Data = b.Data)
+					and a.NumeroParcela = b.NumeroParcela);
 
 Set @LinhasInseridas = @@RowCount;
 
@@ -275,7 +275,9 @@ Set @Etapa = 'Atualizacao de dados';
 Update a
 Set a.DataCancelamento = b.DataCancelamento
 From dbDataDwItau.itau.Vencimentos360 a with(nolock)
-inner join #VencimentosFinal b with(nolock) on a.IdAcordo = b.IdAcordo
+inner join #VencimentosFinal b with(nolock) on a.IdBase = b.IdBase
+											   and a.IdAcordo = b.IdAcordo
+											   and a.NumeroParcela = b.NumeroParcela
 Where
 	b.DataCancelamento is not null
 	and a.DataCancelamento is null;
