@@ -1,6 +1,6 @@
-Create or Alter procedure itau.ProcAcordos360 as
+Create or Alter procedure itau.ProcBaseMailing360 as
 
-------------------------------> Descrição da procedure
+----------------------------> Descrição da procedure
 
 /*
 	Padrão de escrita: PascalCase
@@ -18,14 +18,13 @@ Create or Alter procedure itau.ProcAcordos360 as
 	o tempo de execução.
 */
 
-------------------------------> Definições de variaveis e controles de ambiente
+----------------------------> Definições de variaveis e controles de ambiente
 
 Set Nocount On;
 
-Declare @NomeProcedure varchar(128) = 'ProcAcordos360',
+Declare @NomeProcedure varchar(128) = 'ProcBaseMailing360',
         @Etapa varchar(100) = 'Inicio',
 		@UltimaAtualizacao datetime,
-		@DataPagamento datetime,
         @IdExecucao int,
         @LinhasOrigem int,
         @LinhasInseridas int,
@@ -38,7 +37,7 @@ Declare @NomeProcedure varchar(128) = 'ProcAcordos360',
         @LinhaErro int;
 
 /* Inicia o controle de logs */
-Exec dbDataDwItau.[log].ProcControles
+Exec dbDataDwItau.log.ProcControles
     @TipoLog = 'Execucao',
     @NomeProcedure = @NomeProcedure,
     @DataHoraInicio = @DataHoraInicio,
@@ -47,7 +46,7 @@ Exec dbDataDwItau.[log].ProcControles
 
 Begin Try
 
---------------------------------> Criacao de tabelas temporarias
+------------------------------> Criação de tabelas
 
 Set @Etapa = 'Criacao das tabelas temporarias';
 
@@ -57,165 +56,110 @@ If Object_id('Tempdb..#Base') Is not null Drop table #Base;
 Create table #Base (
 	IdBase int,
 	Data datetime,
+	CodigoReferencia smallint,
 	IdDevedor int,
 	IdTitulo int
 );
 
---- | Acordos
+--- | Mailing
 
-If Object_id('Tempdb..#Acordos') Is not null Drop table #Acordos;
-Create table #Acordos (
-	IdAcordo int,
-	TipoAcordo varchar(32),
+If Object_id('Tempdb..#Mailing') Is not null Drop table #Mailing;
+Create table #Mailing (
 	IdDevedor int,
-	IdTitulo int,
-	Plano int,
-	NumeroParcela int,
-	Valor money,
-	Referencia varchar(64),
-	DataInclusao datetime,
-	Proposta char(1),
-	DataAprovacaoProposta datetime,
-	StatusAcordo varchar(64),
-	DataCancelamento datetime,
-	IdOrigemAcordo char(2)
+	IdCarteira int,
+	CodigoReferencia smallint,
+	IdRetirada int
 );
 
---- | Acordos final
+--- | MailingFinal
 
-If Object_id('Tempdb..#AcordosFinal') Is not null Drop table #AcordosFinal;
-Create table #AcordosFinal (
+If Object_id('Tempdb..#MailingFinal') Is not null Drop table #MailingFinal;
+Create table #MailingFinal (
 	IdBase int,
-	IdAcordo int,
-	TipoAcordo varchar(32),
+	Data datetime,
 	IdDevedor int,
 	IdTitulo int,
-	Plano int,
-	NumeroParcela int,
-	Valor money,
-	Referencia varchar(64),
-	DataInclusao datetime,
-	Proposta char(1),
-	DataAprovacaoProposta datetime,
-	StatusAcordo varchar(64),
-	DataCancelamento datetime,
-	IdOrigemAcordo char(2)
+	IdRetirada int
 );
 
-------------------------------> Carga das tabelas temporarias
-
-Set @Etapa = 'Carga das tabelas temporarias';
+------------------------------> Insere dados em tabelas
 
 --- | Base
 
 Insert into #Base (
-				   IdBase,
-				   Data,
-				   IdDevedor,
-				   IdTitulo
-				  )
+					IdBase,
+					Data,
+					CodigoReferencia,
+					IdDevedor,
+					IdTitulo
+				)
 Select
 	IdBase,
 	Data,
+	CodigoReferencia,
 	IdDevedor,
 	IdTitulo
 From dbDataDwItau.itau.Base360 With(nolock)
-Where 
-	Data >= Convert(date, Getdate());
-
---- | Acordos
-
-Insert into #Acordos (
-					  IdAcordo,
-					  TipoAcordo,
-					  IdDevedor,
-					  IdTitulo,
-					  Plano,
-					  NumeroParcela,
-					  Valor,
-					  Referencia,
-					  DataInclusao,
-					  Proposta,
-					  DataAprovacaoProposta,
-					  StatusAcordo,
-					  DataCancelamento,
-					  IdOrigemAcordo
-					 )
-Select distinct
-	a.IdAcordo,
-	b.TipoAcordo,
-	a.IdDevedor,
-	c.IdTitulo,
-	a.Plano,
-	d.NumeroParcela,
-	d.Valor,
-	e.Referencia,
-	a.DataInclusao,
-	a.Proposta,
-	a.DataAprovacaoProposta,
-	f.StatusAcordo,
-	a.DataCancelamento,
-	g.IdOrigemAcordo
-From misitau.misitau.dbo.Acordos a With(nolock)
-Inner join misitau.misitau.dbo.TiposAcordos b With(nolock) on a.IdTipoAcordo = b.IdTipoAcordo
-Inner join misitau.misitau.dbo.AcordosParcelasNegociadas c With(nolock) on a.IdAcordo = c.IdAcordo
-Inner join misitau.misitau.dbo.AcordosParcelasPagar d With(nolock) on a.IdAcordo = d.IdAcordo
-Inner join misitau.misitau.dbo.Usuarios e With(nolock) on a.IdNegociadorResponsavel = e.IdUsuario
-Inner join misitau.misitau.dbo.StatusAcordos f With(nolock) on a.IdStatusAcordo = f.IdStatusAcordo
-Inner join misitau.misitau.dbo.OrigemAcordos g With(nolock) on a.IdAcordo = g.IdAcordo
 Where
-	a.DataInclusao >= Convert(date,Getdate())
-	or a.DataCancelamento >= Convert(date,Getdate())
-	or a.DataAprovacaoProposta >= Convert(date,Getdate());
+	Data >= Convert(date,Getdate());
 
---- | Acordos final
+/*
+	Criação de index não clusterizado
+	Obs: Feito fora de etapa pois favorece no carregamento de dados na tabela final
+*/
 
-Insert into #AcordosFinal (
-						IdBase,
-						IdAcordo,
-						TipoAcordo,
-						IdDevedor,
-						IdTitulo,
-						Plano,
-						NumeroParcela,
-						Valor,
-						Referencia,
-						DataInclusao,
-						Proposta,
-						DataAprovacaoProposta,
-						StatusAcordo,
-						DataCancelamento,
-						IdOrigemAcordo
+Create nonclustered index IxBase on #Base (IdDevedor, CodigoReferencia) Include (Data, IdTitulo);
+
+--- | Mailing
+
+Insert into #Mailing (
+					IdDevedor,
+					IdCarteira,
+					CodigoReferencia,
+					IdRetirada
+					)
+Select
+	a.IdDevedor,
+	a.IdCarteira,
+	b.CodigoReferencia,
+	a.IdRetirada
+From misitau.misitau.dbo.Mailing a With(nolock)
+Inner join misitau.misitau.dbo.Carteiras b With(nolock) on a.IdCarteira = b.IdCarteira;
+
+Set @LinhasOrigem += @@RowCount;
+
+/*
+	Criação de index não clusterizado
+	Obs: Feito fora de etapa pois favorece no carregamento de dados na tabela final
+*/
+
+Create nonclustered index IxMailing on #Mailing (IdDevedor, CodigoReferencia) Include (IdRetirada);
+
+--- | Mailing final
+
+Insert into #MailingFinal (
+							IdBase,
+							Data,
+							IdDevedor,
+							IdTitulo,
+							IdRetirada
 						)
 Select
 	b.IdBase,
-	a.IdAcordo,
-	a.TipoAcordo,
+	b.Data,
 	a.IdDevedor,
-	a.IdTitulo,
-	a.Plano,
-	a.NumeroParcela,
-	a.Valor,
-	a.Referencia,
-	a.DataInclusao,
-	a.Proposta,
-	a.DataAprovacaoProposta,
-	a.StatusAcordo,
-	a.DataCancelamento,
-	a.IdOrigemAcordo
-From #Acordos a With(nolock)
-Inner join #Base b With(nolock) on a.IdDevedor = b.IdDevedor
-								   and a.IdTitulo = b.IdTitulo
-								   and Convert(date,a.DataInclusao) = b.Data;
+	b.IdTitulo,
+	a.IdRetirada
+From #Mailing a
+Inner join #Base b on a.IdDevedor = b.IdDevedor
+				      and a.CodigoReferencia = b.CodigoReferencia;
 
-Set @LinhasOrigem = @@RowCount;
+/*
+	Criação de index não clusterizado
+	Obs: Feito fora de etapa pois favorece no carregamento de dados na tabela final
+*/
 
-------------------------------> Criacao de índices
-
-Set @Etapa = 'Criacao de indices';
-
-/* Cria index não clusterizado */
-Create nonclustered index IxAcordos360 on #AcordosFinal (IdBase, IdAcordo, NumeroParcela);
+Create nonclustered index IxMailingFinal on #MailingFinal (IdBase) Include (Data, IdDevedor, IdTitulo, IdRetirada);
 
 ------------------------------> Persistencia final
 
@@ -223,47 +167,25 @@ Set @Etapa = 'Persistencia final';
 
 --- | Tabela fisica
 
-Insert into dbDataDwItau.itau.Acordos360 (
-										IdBase,
-										IdAcordo,
-										TipoAcordo,
-										IdDevedor,
-										IdTitulo,
-										Plano,
-										NumeroParcela,
-										Valor,
-										Referencia,
-										DataInclusao,
-										Proposta,
-										DataAprovacaoProposta,
-										StatusAcordo,
-										DataCancelamento,
-										IdOrigemAcordo
-										 )
-Select 
+Insert into dbDataDwItau.itau.BaseMailing360 (
+											IdBase,
+											Data,
+											IdDevedor,
+											IdTitulo,
+											IdRetirada
+											)
+Select
 	IdBase,
-	IdAcordo,
-	TipoAcordo,
+	Data,
 	IdDevedor,
 	IdTitulo,
-	Plano,
-	NumeroParcela,
-	Valor,
-	Referencia,
-	DataInclusao,
-	Proposta,
-	DataAprovacaoProposta,
-	StatusAcordo,
-	DataCancelamento,
-	IdOrigemAcordo
-From #AcordosFinal a
-Where 
+	IdRetirada
+From #MailingFinal a
+Where
 	Not exists (Select 1
-				From dbDataDwItau.itau.Acordos360 b With(nolock)
-				Where 
-					a.IdBase = b.IdBase
-					and a.IdAcordo = b.IdAcordo
-					and a.NumeroParcela = b.NumeroParcela);
+				From dbDataDwItau.itau.BaseMailing360 b With(nolock)
+				Where
+					a.IdBase = b.IdBase);
 
 Set @LinhasInseridas = @@RowCount;
 
@@ -273,34 +195,25 @@ Set @Etapa = 'Atualizacao de dados';
 
 --- | Atualiza campos da tabela fisica
 
-/* Atualiza a Proposta e Cancelamento */
-
 Update a
-Set a.Proposta = b.Proposta,
-	a.DataAprovacaoProposta = b.DataAprovacaoProposta,
-	a.StatusAcordo = b.StatusAcordo,
-	a.DataCancelamento = b.DataCancelamento
-From dbDataDwItau.itau.Acordos360 a With(nolock)
-Inner join #AcordosFinal b With(nolock) on a.IdBase = b.IdBase
-										   and a.IdAcordo = b.IdAcordo
-										   and a.NumeroParcela = b.NumeroParcela
+Set a.IdRetirada = b.IdRetirada
+From dbDataDwItau.itau.BaseMailing360 a With(nolock)
+Inner join #MailingFinal b With(nolock) on a.IdBase = b.IdBase
 Where
-	Isnull(a.DataAprovacaoProposta,'1900-01-01') <> Isnull(b.DataAprovacaoProposta,'1900-01-01')
-	or a.StatusAcordo <> b.StatusAcordo
-	or Isnull(a.DataCancelamento,'1900-01-01') <> Isnull(b.DataCancelamento,'1900-01-01');
+	Isnull(a.IdRetirada,0) <> Isnull(b.IdRetirada,0);
 
 Set @LinhasAtualizadas += @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + isnull(@LinhasAtualizadas, 0);
 Set @DataHoraFim = Getdate();
 
 /* Grava volumetria controles de log */
-Exec dbDataDwItau.[log].ProcControles
+Exec dbDataDwItau.log.ProcControles
     @TipoLog = 'Volumetria',
     @IdExecucao = @IdExecucao,
-    @NomeTabelaDestino = 'itau.Acordos360',
+    @NomeTabelaOrigem = 'misitau.dbo.Mailing',
+    @NomeTabelaDestino = 'dbDataDWItau.itau.BaseMailing360',
     @LinhasOrigem = @LinhasOrigem,
     @LinhasInseridas = @LinhasInseridas,
-    @LinhasAtualizadas = @LinhasAtualizadas,
     @LinhasTotaisDestino = @LinhasTotaisDestino;
 
 /* Finaliza execução controles de log concluido */
@@ -310,12 +223,12 @@ Exec dbDataDwItau.[log].ProcControles
     @DataHoraFim = @DataHoraFim,
     @StatusExecucao = 'Concluida';
 
-End Try
+End try
 Begin Catch
 
 Set @MensagemErro = Error_message();
 Set @NumeroErro = Error_number();
-Set @LinhaErro = Error_line();
+Set @LinhaErro = Error_line()
 
 /* Finalizacao execução de log erro */
 Set @DataHoraFim = Getdate();
