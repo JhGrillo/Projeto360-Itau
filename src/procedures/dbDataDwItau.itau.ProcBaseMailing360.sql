@@ -7,10 +7,13 @@ Create or Alter procedure itau.ProcBaseMailing360 as
     Nome: ProcBaseMailing360
     DataCriação: 12/08/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização:
-    Atualizado por:
+    DataAtualização: 17/08/2026
+    Atualizado por:	João Henrique Cavalheiro Grillo
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+	17/08/2026 João Henrique Cavalheiro Grillo: Refatoramento da procedure para melhoria do tempo de execução, foi criado index nas origens do mailing e na Base360
+	oque melhorou significativamente o tempo de execução.
 */
 
 ----------------------------> Definições de variaveis e controles de ambiente
@@ -94,9 +97,16 @@ Select
 	CodigoReferencia,
 	IdDevedor,
 	IdTitulo
-From itau.Base360 With(nolock)
+From dbDataDwItau.itau.Base360 With(nolock)
 Where
 	Data >= Convert(date,Getdate());
+
+/*
+	Criação de index não clusterizado
+	Obs: Feito fora de etapa pois favorece no carregamento de dados na tabela final
+*/
+
+Create nonclustered index IxBase on #Base (IdDevedor, CodigoReferencia) Include (Data, IdTitulo);
 
 --- | Mailing
 
@@ -116,6 +126,13 @@ Inner join misitau.misitau.dbo.Carteiras b With(nolock) on a.IdCarteira = b.IdCa
 
 Set @LinhasOrigem += @@RowCount;
 
+/*
+	Criação de index não clusterizado
+	Obs: Feito fora de etapa pois favorece no carregamento de dados na tabela final
+*/
+
+Create nonclustered index IxMailing on #Mailing (IdDevedor, CodigoReferencia) Include (IdRetirada);
+
 --- | Mailing final
 
 Insert into #MailingFinal (
@@ -134,6 +151,13 @@ Select
 From #Mailing a
 Inner join #Base b on a.IdDevedor = b.IdDevedor
 				      and a.CodigoReferencia = b.CodigoReferencia;
+
+/*
+	Criação de index não clusterizado
+	Obs: Feito fora de etapa pois favorece no carregamento de dados na tabela final
+*/
+
+Create nonclustered index IxMailingFinal on #MailingFinal (IdBase) Include (Data, IdDevedor, IdTitulo, IdRetirada);
 
 ------------------------------> Persistencia final
 
@@ -171,7 +195,7 @@ Set @Etapa = 'Atualizacao de dados';
 
 Update a
 Set a.IdRetirada = b.IdRetirada
-From dbDataDwItau.itau.Mailing360 a With(nolock)
+From dbDataDwItau.itau.BaseMailing360 a With(nolock)
 Inner join #MailingFinal b With(nolock) on a.IdBase = b.IdBase
 Where
 	Isnull(a.IdRetirada,0) <> Isnull(b.IdRetirada,0);
@@ -185,7 +209,7 @@ Exec dbDataDwItau.log.ProcControles
     @TipoLog = 'Volumetria',
     @IdExecucao = @IdExecucao,
     @NomeTabelaOrigem = 'misitau.dbo.Mailing',
-    @NomeTabelaDestino = 'dbDataDWItau.itau.Mailing360',
+    @NomeTabelaDestino = 'dbDataDWItau.itau.BaseMailing360',
     @LinhasOrigem = @LinhasOrigem,
     @LinhasInseridas = @LinhasInseridas,
     @LinhasTotaisDestino = @LinhasTotaisDestino;

@@ -1,0 +1,1 @@
+Create nonclustered index IxMailingIdCarteira on misitau.dbo.Mailing (IdCarteira) include (IdDevedor, IdRetirada);

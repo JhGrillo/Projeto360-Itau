@@ -1,0 +1,1 @@
+Create nonclustered index IxBase360Consulta on dbDataDwItau.itau.Base360 (Data) Include (IdBase, CodigoReferencia, IdDevedor, IdTitulo);
