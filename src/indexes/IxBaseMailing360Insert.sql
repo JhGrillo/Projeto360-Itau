@@ -1,0 +1,1 @@
+Create nonclustered index IxBaseMailing360Insert on dbDataDwItau.itau.BaseMailing360 (IdBase);
