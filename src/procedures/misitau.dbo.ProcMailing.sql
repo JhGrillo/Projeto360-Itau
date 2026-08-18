@@ -1,18 +1,22 @@
-Create or Alter procedure dbo.ProcMailing as
+Create or Alter Procedure dbo.ProcMailing as 
 
 ------------------------------> Descrição da procedure
 
 /*
     Padrão de escrita: PascalCase
-    Nome: ProcAcordosParcelasPagar
+    Nome: ProcMailing
     DataCriação: 03/08/2026
     Criado por: Leonardo Matheus Talarico
-    DataAtualização: 12/08/2026
-    Atualizado por: João Henrique Cavalheiro Grillo
+    DataAtualização: 18/08/2026
+    Atualizado por: Leonardo Matheus Talarico
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
 
     12/08/2026 João Henrique Cavalheiro Grillo: Foi incrementado a regra de bloqueios utilizada no itau espelhando a regra da procedure de projetos.
+
+    18/08/2026 Leonardo Matheus Talarico: Foi modificado a forma como as devoluções são carregadas, desconsiderando totalmente informações da base 
+    que possuem informações de retirada e foi introduzido nas linhas de insert da devolução o Set que verifica a quantidade de LinhasOrigens das 
+    Devoluções para que possa entrar seus valores nas informações de Log
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -136,7 +140,15 @@ Where
                 From AtivosCTE b
                 Where
                     a.IdCarteira = b.IdCarteira
-                    and a.IdDevedor = b.IdDevedor);
+                    and a.IdDevedor = b.IdDevedor)
+    and Not exists (Select 1
+                    From misitau.dbo.Mailing c With(nolock)
+                    Where 
+                        a.IdCarteira = c.IdCarteira
+                        and a.IdDevedor = c.IdDevedor
+                        and c.IdRetirada is not null);
+
+Set @LinhasOrigem += @@RowCount;
 
 --- | Ocorrências
 
@@ -188,10 +200,18 @@ Insert into #Devolucoes (
 Select
     IdCarteira,
     IdDevedor
-From #OcorrenciasDevolucoes
+From #OcorrenciasDevolucoes a
 Where
-    Complemento in ('Colchão','Remessa')
-    or Complemento like '%BAIXA PGTO DO / DT PGTO%';
+    (Complemento in ('Colchão','Remessa')
+    or Complemento like '%BAIXA PGTO DO / DT PGTO%')
+    and Not Exists (Select 1
+                    From misitau.dbo.Mailing c With(nolock)
+                    Where
+                        a.IdCarteira = c.IdCarteira
+                        and a.IdDevedor = c.IdDevedor
+                        and c.IdRetirada is not null);
+
+Set @LinhasOrigem = @@RowCount;
 
 --- | Mailing
 
@@ -210,7 +230,7 @@ Where
                     a.IdDevedor = b.IdDevedor
                     and a.IdCarteira = b.IdCarteira);
 
-Set @LinhasOrigem = @@RowCount;
+Set @LinhasOrigem += @@RowCount;
 
 ------------------------------> Criacao de índices
 
@@ -269,12 +289,17 @@ Set @LinhasAtualizadas = @@RowCount;
 Update a
 Set a.IdRetirada = 2
 From misitau.dbo.Mailing a
-WHere
+Where
     Not Exists (Select 1
                 From #DadosOrigem b
                 Where
                     Isnull(a.IdCarteira,b.IdCarteira) = b.IdCarteira
-                    and a.IdDevedor = b.IdDevedor);
+                    and a.IdDevedor = b.IdDevedor)
+    and Exists (Select 1
+            From #Devolucoes c
+            Where
+                Isnull(a.IdCarteira,c.IdCarteira) = c.IdCarteira
+                and a.IdDevedor = c.IdDevedor);
 
 Set @LinhasAtualizadas += @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + isnull(@LinhasAtualizadas, 0);
