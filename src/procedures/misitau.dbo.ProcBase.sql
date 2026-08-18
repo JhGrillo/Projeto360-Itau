@@ -1,4 +1,4 @@
-Create or Alter procedure dbo.ProcBase as 
+Create or Alter Procedure dbo.ProcBase as 
 
 ------------------------------> Descrição da procedure
 
@@ -7,14 +7,16 @@ Create or Alter procedure dbo.ProcBase as
     Nome: ProcBase
     DataCriação: 04/08/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização: 04/08/2026
-    Atualizado por: João Henrique Cavalheiro Grillo
+    DataAtualização: 18/08/2026
+    Atualizado por: Leonardo Matheus Talarico
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
 
     04/08/2026 João Henrique Cavalheiro Grillo: Foi retirado da procedure colunas que realizavam calculos
     com regras de negócios, pois a ideia de procedure ProcBase é armazenar dados de clientes ativos, qualquer calculo
     de regra de negócio é feito no processo que usara a dbo.Base como origem.
+
+    18/08/2026 Leonardo Matheus Talarico: Foi adicionado um contador para as Linhas De Origem no momento em que são inseridas as Parcelas
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -180,6 +182,8 @@ Where
 	a.IdSituacaoParcela = 'A'
 Group by
 	a.IdTitulo;
+
+Set @LinhasOrigem = @@RowCount;
 
 --- | Titulos
 
