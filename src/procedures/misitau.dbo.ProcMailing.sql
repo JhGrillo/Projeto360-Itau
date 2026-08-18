@@ -36,7 +36,7 @@ Declare @NomeProcedure varchar(128) = 'ProcMailing',
         @NumeroErro int,
         @LinhaErro int;
 
-/* Inicia o controle de logs */
+--/* Inicia o controle de logs */
 Exec misitau.[log].ProcControles
     @TipoLog = 'Execucao',
     @NomeProcedure = @NomeProcedure,
@@ -141,14 +141,14 @@ Where
                 Where
                     a.IdCarteira = b.IdCarteira
                     and a.IdDevedor = b.IdDevedor)
-    and Not exists (Select 1
-                    From misitau.dbo.Mailing c With(nolock)
-                    Where 
-                        a.IdCarteira = c.IdCarteira
-                        and a.IdDevedor = c.IdDevedor
-                        and c.IdRetirada is not null);
+    and Exists (Select 1
+                From misitau.dbo.Mailing c With(nolock)
+                Where 
+                    a.IdCarteira = c.IdCarteira
+                    and a.IdDevedor = c.IdDevedor
+                    and c.IdRetirada is null);
 
-Set @LinhasOrigem += @@RowCount;
+Set @LinhasOrigem = @@RowCount;
 
 --- | Ocorrências
 
@@ -204,14 +204,14 @@ From #OcorrenciasDevolucoes a
 Where
     (Complemento in ('Colchão','Remessa')
     or Complemento like '%BAIXA PGTO DO / DT PGTO%')
-    and Not Exists (Select 1
-                    From misitau.dbo.Mailing c With(nolock)
-                    Where
-                        a.IdCarteira = c.IdCarteira
-                        and a.IdDevedor = c.IdDevedor
-                        and c.IdRetirada is not null);
+    and Exists (Select 1
+                From misitau.dbo.Mailing c With(nolock)
+                Where
+                    a.IdCarteira = c.IdCarteira
+                    and a.IdDevedor = c.IdDevedor
+                    and c.IdRetirada is null);
 
-Set @LinhasOrigem = @@RowCount;
+Set @LinhasOrigem += @@RowCount;
 
 --- | Mailing
 
@@ -290,16 +290,12 @@ Update a
 Set a.IdRetirada = 2
 From misitau.dbo.Mailing a
 Where
-    Not Exists (Select 1
-                From #DadosOrigem b
-                Where
-                    Isnull(a.IdCarteira,b.IdCarteira) = b.IdCarteira
-                    and a.IdDevedor = b.IdDevedor)
-    and Exists (Select 1
-            From #Devolucoes c
-            Where
-                Isnull(a.IdCarteira,c.IdCarteira) = c.IdCarteira
-                and a.IdDevedor = c.IdDevedor);
+    IdRetirada is null
+    and Not Exists (Select 1
+                    From #DadosOrigem b
+                    Where
+                        Isnull(a.IdCarteira,b.IdCarteira) = b.IdCarteira
+                        and a.IdDevedor = b.IdDevedor);
 
 Set @LinhasAtualizadas += @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + isnull(@LinhasAtualizadas, 0);
