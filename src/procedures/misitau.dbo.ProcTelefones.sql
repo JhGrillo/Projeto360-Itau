@@ -96,8 +96,8 @@ Set @Etapa = 'Carga das tabelas temporarias';
 Set @IdTelefone = (Select Max(IdTelefone) From misitau.dbo.Telefones With(nolock));
 Set @UltimaAtualizacao = (Select 
                             Case
-                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,+1,Convert(date,DataHoraInicio)))
-                                else Max(Convert(date,DataHoraInicio))
+                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,-2,Convert(date,DataHoraInicio)))
+                                else Max(Convert(date,DataHoraInicio - 1))
                             end
                           From misitau.[log].ControleExecucoes
                           Where
@@ -244,7 +244,7 @@ Where
 				From misitau.dbo.Telefones c
 				Where 
 					a.IdTelefone = c.IdTelefone
-					and a.DataAtualizacao = c.DataAtualizacao);
+					and a.DataAtualizacao = b.DataAtualizacao);
 
 Set @LinhasAtualizadas = @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + @LinhasAtualizadas;
