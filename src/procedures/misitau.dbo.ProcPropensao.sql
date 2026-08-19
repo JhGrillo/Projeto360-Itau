@@ -1,10 +1,10 @@
-Create or Alter procedure dbo.ProcPropensao as
+Create or Alter Procedure dbo.ProcPropensao as
 
 ------------------------------> Descrição da procedure
 
 /*
     Padrão de escrita: PascalCase
-    Nome: ProcEscob
+    Nome: ProcPropensao
     DataCriação: 31/07/2026
     Criado por: João Henrique Cavalheiro Grillo
     DataAtualização:
@@ -17,7 +17,7 @@ Create or Alter procedure dbo.ProcPropensao as
 
 Set nocount on;
 
-Declare @NomeProcedure varchar(128) = 'ProPropensao',
+Declare @NomeProcedure varchar(128) = 'ProcPropensao',
     @Etapa varchar(100) = 'Inicio',
     @IdPropensao int,
     @UltimaAtualizacao datetime,
@@ -64,8 +64,8 @@ Set @Etapa = 'Carga das tabelas temporarias';
 Set @IdPropensao = (Select Max(IdPropensao) From misitau.dbo.Propensao With(nolock));
 Set @UltimaAtualizacao = (Select 
                             Case
-                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,+1,Convert(date,DataHoraInicio)))
-                                else Max(Convert(date,DataHoraInicio))
+                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,-2,Convert(date,DataHoraInicio)))
+                                else Max(Convert(date,DataHoraInicio - 1))
                             end
                           From misitau.[log].ControleExecucoes
                           Where

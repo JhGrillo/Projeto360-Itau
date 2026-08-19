@@ -1,4 +1,4 @@
-Create or alter procedure dbo.ProcDevedoresInformacoesComplementares as
+Create or Alter Procedure dbo.ProcDevedoresInformacoesComplementares as 
 
 ------------------------------> Descrição da procedure
 
@@ -91,8 +91,8 @@ Set @Etapa = 'Carga das tabelas temporarias';
 Set @IdDevedorInformacaoComplementar = (Select Max(IdDevedorInformacaoComplementar) From misitau.dbo.DevedoresInformacoesComplementares With(nolock));
 Set @UltimaAtualizacao = (Select 
                             Case
-                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,+1,Convert(date,DataHoraInicio)))
-                                else Max(Convert(date,DataHoraInicio))
+                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,-2,Convert(date,DataHoraInicio)))
+                                else Max(Convert(date,DataHoraInicio - 1))
                             end
                           From misitau.[log].ControleExecucoes
                           Where

@@ -4,13 +4,16 @@ Create or Alter Procedure dbo.ProcTitulosInformacoesComplementares as
 
 /*
 	Padrão de escrita: PascalCase
-	Nome: ProcDevedores
+	Nome: ProcTitulosInformacoesComplementares
 	DataCriação: 23/07/2026
 	Criado por: Leonardo Matheus Talarico
-	DataAtualização:
-	Atualizado por:
+	DataAtualização: 30/07/2026
+	Atualizado por: João Henrique Cavalheiro Grillo
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+	30/07/2026 João Henrique Cavalheiro Grillo: Refatoramento para melhoria de performance, foi criado um novo index na tabela de origem para melhorar o Not Exists, e adicionado
+	uma temporaria antes com carregamento apenas dos dados novos ou atualizado para depois realizar o filtro comparativo com o destino.
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -46,6 +49,101 @@ Begin Try
 ------------------------------> Criacao de tabelas temporarias
 
 Set @Etapa = 'Criacao das tabelas temporarias';
+
+--- | Origem
+
+If Object_id('Tempdb..#DadosOrigem') Is not null Drop table #DadosOrigem;
+Create table #DadosOrigem (
+	IdTituloInformacaoComplementar int,
+	DataInclusao datetime,
+	IdUsuarioInclusao int,
+	DataAtualizacao datetime,
+	IdUsuarioAtualizacao int,
+	IdTitulo int,
+	TipoContrato varchar(30),
+	AgenciaPlataforma char(4),
+	RegiaoPlataforma char(2),
+	NumeroRecebimento char(12),
+	DataContratacao smalldatetime,
+	DataVencimentoContratoFatura smalldatetime,
+	ValorContratoAtualizado money,
+	QuantidadeParcelaAtraso tinyint,
+	ValorContratoVencimento money,
+	Empresa char(2),
+	DataEnvioContrato smalldatetime,
+	DataLimiteRetornoContrato smalldatetime,
+	CodigoParecerEscritorioAnterior varchar(4),
+	ParecerEscritorioAnterior1 varchar(68),
+	ParecerEscritorioAnterior2 varchar(68),
+	CodigoFilial varchar(5),
+	ValorEncargosContrato money,
+	CodigoEstrategia char(2),
+	TarifaCobranca money,
+	FaseCobranca char(2),
+	CodigoSegurador char(3),
+	CodigoOperacaoFinaustria varchar(4),
+	NumeroContratoFinaustria varchar(12),
+	CreditoImobiliarioSUSLIM char(1),
+	EstrategiaIDSTG1 char(5),
+	DataAtivacaoCobrancaConsorcio smalldatetime,
+	NumeroCartao varchar(16),
+	AgenciaContaCedenteDAC varchar(12),
+	CodigoCarteira char(3),
+	ValorAcordoPL money,
+	CodigoOcorrenciaCobrancaJuridico varchar(5),
+	CategoriaVeiculoCliente char(2),
+	NumeroParcela char(3),
+	IdTituloOriginal int,
+	ContratoPiloto char(1),
+	DataExclusao datetime,
+	IdUsuarioExclusao int,
+	ValidoDe datetime2,
+	ValidoAte datetime2,
+	ValorEntradaDiferenciada money,
+	DataEntregaAmigavel date,
+	DataUltimoAtraso datetime,
+	DataVencimentoProximaParcela datetime,
+	CodigoFamiliaProduto varchar(8),
+	QuantidadeParcelasAbertoContrato varchar(8),
+	QuantidadeParcelasPagas varchar(8),
+	DataUltimoEnvioEmail datetime,
+	DataUltimoEnvioPush datetime,
+	DataUltimoEnvioSMS datetime,
+	ValorMinimoFatura varchar(16),
+	ValorSaldoTotalFatura varchar(16),
+	QuantidadeDiasUtilizaLis varchar(8),
+	ValorSaldoTotalFaturaSistema varchar(16),
+	QuantParcelamentosFatura varchar(4),
+	ValorReferenciaFatura varchar(16),
+	ValorMinimoFaturaSistema varchar(16),
+	DataUltimoPagamentoFatura datetime,
+	CodigoEscritorioCobranca varchar(8),
+	NomeProduto varchar(100),
+	AreaNegocio varchar(2),
+	QuantidadeDiasAtraso varchar(8),
+	CodigoSubnivelCarteira varchar(16),
+	CodigoClusterScore varchar(4),
+	CodigoMotivoExclusao varchar(4),
+	Origem varchar(8),
+	CorrelationID varchar(100),
+	ValorTotalRiscoVencido varchar(10),
+	QuantidadeTotalParcelas varchar(10),
+	ValorContratoNoVencimento varchar(10),
+	TaxaJurosNominal varchar(10),
+	CodigoRenavam varchar(16),
+	IndicadorSaldoRemanescente varchar(10),
+	DataVendaVeiculo varchar(10),
+	DataApreensaoVeiculo varchar(10),
+	IndicadorAcaoContra varchar(1),
+	CodigoPlacaVeiculo varchar(10),
+	AnoModeloVeiculo varchar(4),
+	AnoFabricacaoVeiculo varchar(4),
+	ModeloMarcaVeiculo varchar(256),
+	DataVencimentoContrato varchar(10),
+	DataUltimaParcelaConsig varchar(10),
+	ValorUltimoPagamentoConsignado varchar(10),
+	ValorSaldoDevedorContabil varchar(10)
+);
 
 --- | Titulos informações complementares
 
@@ -151,13 +249,206 @@ Set @Etapa = 'Carga das tabelas temporarias';
 Set @IdTituloInformacaoComplementar = (Select Max(IdTituloInformacaoComplementar) From misitau.dbo.TitulosInformacoesComplementares With(nolock));
 Set @UltimaAtualizacao = (Select 
 							Case
-								when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,+1,Convert(date,DataHoraInicio)))
-								else Max(Convert(date,DataHoraInicio))
+								when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,-2,Convert(date,DataHoraInicio)))
+								else Max(Convert(date,DataHoraInicio - 1))
 							end
                          From misitau.[log].ControleExecucoes
                          Where
                             NomeProcedure = 'ProcTitulosInformacoesComplementares'
                             and StatusExecucao = 'Concluida');
+
+Insert into #DadosOrigem (
+						IdTituloInformacaoComplementar,
+						DataInclusao,
+						IdUsuarioInclusao,
+						DataAtualizacao,
+						IdUsuarioAtualizacao,
+						IdTitulo,
+						TipoContrato,
+						AgenciaPlataforma,
+						RegiaoPlataforma,
+						NumeroRecebimento,
+						DataContratacao,
+						DataVencimentoContratoFatura,
+						ValorContratoAtualizado,
+						QuantidadeParcelaAtraso,
+						ValorContratoVencimento,
+						Empresa,
+						DataEnvioContrato,
+						DataLimiteRetornoContrato,
+						CodigoParecerEscritorioAnterior,
+						ParecerEscritorioAnterior1,
+						ParecerEscritorioAnterior2,
+						CodigoFilial,
+						ValorEncargosContrato,
+						CodigoEstrategia,
+						TarifaCobranca,
+						FaseCobranca,
+						CodigoSegurador,
+						CodigoOperacaoFinaustria,
+						NumeroContratoFinaustria,
+						CreditoImobiliarioSUSLIM,
+						EstrategiaIDSTG1,
+						DataAtivacaoCobrancaConsorcio,
+						NumeroCartao,
+						AgenciaContaCedenteDAC,
+						CodigoCarteira,
+						ValorAcordoPL,
+						CodigoOcorrenciaCobrancaJuridico,
+						CategoriaVeiculoCliente,
+						NumeroParcela,
+						IdTituloOriginal,
+						ContratoPiloto,
+						DataExclusao,
+						IdUsuarioExclusao,
+						ValidoDe,
+						ValidoAte,
+						ValorEntradaDiferenciada,
+						DataEntregaAmigavel,
+						DataUltimoAtraso,
+						DataVencimentoProximaParcela,
+						CodigoFamiliaProduto,
+						QuantidadeParcelasAbertoContrato,
+						QuantidadeParcelasPagas,
+						DataUltimoEnvioEmail,
+						DataUltimoEnvioPush,
+						DataUltimoEnvioSMS,
+						ValorMinimoFatura,
+						ValorSaldoTotalFatura,
+						QuantidadeDiasUtilizaLis,
+						ValorSaldoTotalFaturaSistema,
+						QuantParcelamentosFatura,
+						ValorReferenciaFatura,
+						ValorMinimoFaturaSistema,
+						DataUltimoPagamentoFatura,
+						CodigoEscritorioCobranca,
+						NomeProduto,
+						AreaNegocio,
+						QuantidadeDiasAtraso,
+						CodigoSubnivelCarteira,
+						CodigoClusterScore,
+						CodigoMotivoExclusao,
+						Origem,
+						CorrelationID,
+						ValorTotalRiscoVencido,
+						QuantidadeTotalParcelas,
+						ValorContratoNoVencimento,
+						TaxaJurosNominal,
+						CodigoRenavam,
+						IndicadorSaldoRemanescente,
+						DataVendaVeiculo,
+						DataApreensaoVeiculo,
+						IndicadorAcaoContra,
+						CodigoPlacaVeiculo,
+						AnoModeloVeiculo,
+						AnoFabricacaoVeiculo,
+						ModeloMarcaVeiculo,
+						DataVencimentoContrato,
+						DataUltimaParcelaConsig,
+						ValorUltimoPagamentoConsignado,
+						ValorSaldoDevedorContabil
+					)
+Select
+	IdTituloInformacaoComplementar,
+	DataInclusao,
+	IdUsuarioInclusao,
+	DataAtualizacao,
+	IdUsuarioAtualizacao,
+	IdTitulo,
+	TipoContrato,
+	AgenciaPlataforma,
+	RegiaoPlataforma,
+	NumeroRecebimento,
+	DataContratacao,
+	DataVencimentoContratoFatura,
+	ValorContratoAtualizado,
+	QuantidadeParcelaAtraso,
+	ValorContratoVencimento,
+	Empresa,
+	DataEnvioContrato,
+	DataLimiteRetornoContrato,
+	CodigoParecerEscritorioAnterior,
+	ParecerEscritorioAnterior1,
+	ParecerEscritorioAnterior2,
+	CodigoFilial,
+	ValorEncargosContrato,
+	CodigoEstrategia,
+	TarifaCobranca,
+	FaseCobranca,
+	CodigoSegurador,
+	CodigoOperacaoFinaustria,
+	NumeroContratoFinaustria,
+	CreditoImobiliarioSUSLIM,
+	EstrategiaIDSTG1,
+	DataAtivacaoCobrancaConsorcio,
+	NumeroCartao,
+	AgenciaContaCedenteDAC,
+	CodigoCarteira,
+	ValorAcordoPL,
+	CodigoOcorrenciaCobrancaJuridico,
+	CategoriaVeiculoCliente,
+	NumeroParcela,
+	IdTituloOriginal,
+	ContratoPiloto,
+	DataExclusao,
+	IdUsuarioExclusao,
+	ValidoDe,
+	ValidoAte,
+	ValorEntradaDiferenciada,
+	DataEntregaAmigavel,
+	DataUltimoAtraso,
+	DataVencimentoProximaParcela,
+	CodigoFamiliaProduto,
+	QuantidadeParcelasAbertoContrato,
+	QuantidadeParcelasPagas,
+	DataUltimoEnvioEmail,
+	DataUltimoEnvioPush,
+	DataUltimoEnvioSMS,
+	ValorMinimoFatura,
+	ValorSaldoTotalFatura,
+	QuantidadeDiasUtilizaLis,
+	ValorSaldoTotalFaturaSistema,
+	QuantParcelamentosFatura,
+	ValorReferenciaFatura,
+	ValorMinimoFaturaSistema,
+	DataUltimoPagamentoFatura,
+	CodigoEscritorioCobranca,
+	NomeProduto,
+	AreaNegocio,
+	QuantidadeDiasAtraso,
+	CodigoSubnivelCarteira,
+	CodigoClusterScore,
+	CodigoMotivoExclusao,
+	Origem,
+	CorrelationID,
+	ValorTotalRiscoVencido,
+	QuantidadeTotalParcelas,
+	ValorContratoNoVencimento,
+	TaxaJurosNominal,
+	CodigoRenavam,
+	IndicadorSaldoRemanescente,
+	DataVendaVeiculo,
+	DataApreensaoVeiculo,
+	IndicadorAcaoContra,
+	CodigoPlacaVeiculo,
+	AnoModeloVeiculo,
+	AnoFabricacaoVeiculo,
+	ModeloMarcaVeiculo,
+	DataVencimentoContrato,
+	DataUltimaParcelaConsig,
+	ValorUltimoPagamentoConsignado,
+	ValorSaldoDevedorContabil
+From misitau.cli.TitulosInformacoesComplementares a
+Where
+	IdTituloInformacaoComplementar > Isnull(@IdTituloInformacaoComplementar,0)
+	or DataAtualizacao >= @UltimaAtualizacao;
+
+/* Cria index clusterizado 
+Obs: Este index é criado fora da etapa de index devido a necessidade de performance no comparativo abaixo.
+*/
+Create nonclustered index IxTituloInformacaoComplementar on #DadosOrigem (IdTituloInformacaoComplementar, DataAtualizacao);
+
+--- | Titulos informacoes complementares
 
 Insert into #TitulosInformacoesComplementares (
 												IdTituloInformacaoComplementar,
@@ -340,15 +631,13 @@ Select
 	DataUltimaParcelaConsig,
 	ValorUltimoPagamentoConsignado,
 	ValorSaldoDevedorContabil
-From misitau.cli.TitulosInformacoesComplementares a
+From #DadosOrigem a
 Where
-	(IdTituloInformacaoComplementar > Isnull(@IdTituloInformacaoComplementar,0)
-	or DataAtualizacao >= @UltimaAtualizacao)
-	and Not exists (Select 1
-					From misitau.dbo.TitulosInformacoesComplementares b With(nolock)
-					Where
-						a.IdTituloInformacaoComplementar = b.IdTituloInformacaoComplementar
-						and Isnull(a.DataAtualizacao,'1900-01-01') = Isnull(b.DataAtualizacao,'1900-01-01'));
+	Not exists (Select 1
+				From misitau.dbo.TitulosInformacoesComplementares b
+				Where
+					a.IdTituloInformacaoComplementar = b.IdTituloInformacaoComplementar
+					and Isnull(a.DataAtualizacao,'1900-01-01') = Isnull(b.DataAtualizacao,'1900-01-01'));
 
 Set @LinhasOrigem = @@RowCount;
 

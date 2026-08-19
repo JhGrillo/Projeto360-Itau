@@ -1,4 +1,4 @@
-Create or alter procedure dbo.ProcTelefones as
+Create or Alter Procedure dbo.ProcTelefones as 
 
 ------------------------------> Descrição da procedure
 
@@ -7,7 +7,7 @@ Create or alter procedure dbo.ProcTelefones as
 	Nome: ProcTelefones
 	DataCriação: 27/07/2026
 	Criado por: Leonardo Matheus Talarico
-	DataAtualização: 04/08/2026
+	DataAtualização: 03/08/2026
 	Atualizado por: Leonardo Matheus Talarico
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
@@ -15,14 +15,11 @@ Create or alter procedure dbo.ProcTelefones as
 	03/08/2026 Leonardo Matheus Talarico: Exclusão em algumas colunas na tabela de Telefones,
 	por conta de sua alta demanda de servidor, fazendo com que o processo de mapeamento de indíces
 	apresente erro. 
-
-	04/08/2026 Leonardo Matheus Talarico: Foi alterado a forma que captura dados, agora se baseia nas datas da penultima execução da dbo.Telefones para seguir a mesma regra
-	consultando diretamente na origem, agora a procedure é mais escalavel.
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
 
-Set Nocount On;
+Set Nocount off;
 
 Declare @NomeProcedure varchar(128) = 'ProcTelefones',
         @Etapa varchar(100) = 'Inicio',
@@ -53,23 +50,6 @@ Begin Try
 
 Set @Etapa = 'Criacao das tabelas temporarias';
 
---- | Dados Origem
-
-If Object_id('Tempdb..#DadosOrigem') Is not null Drop table #DadosOrigem;
-Create table #DadosOrigem (
-
-	IdTelefone int,
-	IdDevedor int,
-	IdOrigem int,
-	IdQualificacao int,
-	IdPropriedade int,
-	DDD char(2),
-	Numero char(9),
-	Pontuacao decimal,
-	DataInclusao datetime,
-	DataAtualizacao datetime
-);
-
 --- | Telefones
 
 If Object_id('Tempdb..#Telefones') Is not null Drop table #Telefones;
@@ -96,58 +76,13 @@ Set @Etapa = 'Carga das tabelas temporarias';
 Set @IdTelefone = (Select Max(IdTelefone) From misitau.dbo.Telefones With(nolock));
 Set @UltimaAtualizacao = (Select 
                             Case
-                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,+1,Convert(date,DataHoraInicio)))
-                                else Max(Convert(date,DataHoraInicio))
+                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,-2,Convert(date,DataHoraInicio)))
+                                else Max(Convert(date,DataHoraInicio - 1))
                             end
                           From misitau.[log].ControleExecucoes
                           Where
                             NomeProcedure = 'ProcTelefones'
                             and StatusExecucao = 'Concluida');
-
-With TelefonesCTE as (
-	Select 
-		IdTelefone
-	From misitau.cob.Telefones
-	Where
-		IdTelefone >= isnull(@IdTelefone, 0)
-		or DataAtualizacao >= @UltimaAtualizacao
-)
-Insert into #DadosOrigem (
-						  IdTelefone,
-						  IdDevedor,
-						  IdOrigem,
-						  IdQualificacao,
-						  IdPropriedade,
-						  DDD,
-						  Numero,
-						  Pontuacao,
-						  DataInclusao,
-						  DataAtualizacao
-						 )
-Select
-	IdTelefone,
-	IdDevedor,
-	IdOrigem,
-	IdQualificacao,
-	IdPropriedade,
-	DDD,
-	Numero,
-	Pontuacao,
-	DataInclusao,
-	DataAtualizacao
-From
-	misitau.cob.Telefones a
-Where
-	Exists (Select 1
-			From TelefonesCTE b
-			Where
-				a.IdTelefone = b.IdTelefone);
-
-/* Cria index clusterizado 
-Obs: Este index é criado fora da etapa de index devido a necessidade de performance no comparativo abaixo.
-*/
-Create nonclustered Index IxTelefones on #DadosOrigem (IdTelefone, DataAtualizacao);
-
 Insert into #Telefones (
 						IdTelefone,
 						IdDevedor,
@@ -172,9 +107,11 @@ Select
 	DataInclusao,
 	DataAtualizacao
 From
-	#DadosOrigem a
+	misitau.cob.Telefones a
 Where
-	not exists (Select 1
+	(IdTelefone >= isnull(@IdTelefone, 0)
+	or DataAtualizacao >= @UltimaAtualizacao)
+	and not exists (Select 1
 					From misitau.dbo.Telefones b
 					Where 
 						a.IdTelefone = b.IdTelefone
@@ -244,7 +181,7 @@ Where
 				From misitau.dbo.Telefones c
 				Where 
 					a.IdTelefone = c.IdTelefone
-					and a.DataAtualizacao = c.DataAtualizacao);
+					and a.DataAtualizacao = b.DataAtualizacao);
 
 Set @LinhasAtualizadas = @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + @LinhasAtualizadas;
@@ -294,3 +231,4 @@ Exec misitau.[log].ProcControles
     @EtapaErro = @Etapa;
 
 End Catch;
+	

@@ -1,4 +1,4 @@
-Create or Alter procedure [dbo].[ProcTitulos] as
+Create or Alter Procedure dbo.ProcTitulos as
 
 ------------------------------> Descrição da procedure
 
@@ -78,8 +78,8 @@ Set @Etapa = 'Carga das tabelas temporarias';
 Set @IdTitulo = (Select Max(IdTitulo) From misitau.dbo.Titulos With(nolock));
 Set @UltimaAtualizacao = (Select 
                             Case
-                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,+1,Convert(date,DataHoraInicio)))
-                                else Max(Convert(date,DataHoraInicio))
+                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,-2,Convert(date,DataHoraInicio)))
+                                else Max(Convert(date,DataHoraInicio - 1))
                             end
                           From misitau.[log].ControleExecucoes
                           Where

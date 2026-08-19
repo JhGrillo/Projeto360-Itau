@@ -1,4 +1,4 @@
-Create or Alter procedure dbo.ProcDevedores as
+Create or Alter Procedure dbo.ProcDevedores as 
 
 ------------------------------> Descrição da procedure
 
@@ -77,8 +77,8 @@ Set @Etapa = 'Carga das tabelas temporarias';
 Set @IdDevedor = (Select Max(IdDevedor) From misitau.dbo.Devedores With(nolock));
 Set @UltimaAtualizacao = (Select 
                             Case
-                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,+1,Convert(date,DataHoraInicio)))
-                                else Max(Convert(date,DataHoraInicio))
+                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,-2,Convert(date,DataHoraInicio)))
+                                else Max(Convert(date,DataHoraInicio - 1))
                             end
                           From misitau.[log].ControleExecucoes
                           Where
