@@ -1,4 +1,4 @@
-Create or Alter Procedure dbo.ProcMailing as 
+Create or alter Procedure dbo.ProcMailing as 
 
 ------------------------------> Descrição da procedure
 
@@ -17,7 +17,11 @@ Create or Alter Procedure dbo.ProcMailing as
     18/08/2026 Leonardo Matheus Talarico: Foi modificado a forma como as devoluções são carregadas, desconsiderando totalmente informações da base 
     que possuem informações de retirada e foi introduzido nas linhas de insert da devolução o Set que verifica a quantidade de LinhasOrigens das 
     Devoluções para que possa entrar seus valores nas informações de Log
-*/
+
+    14/08/2026 João Henrique Cavalheiro Grillo: Foi feito uma condicional para quando for atualizada as informações na tabela
+    impedindo assim que após o horário em que a tabela do time de projetos é truncada, não seja feita nenhuma atualização
+    após às 20h
+*/  
 
 ------------------------------> Definições de variaveis e controles de ambiente
 
@@ -286,16 +290,21 @@ Where
 
 Set @LinhasAtualizadas = @@RowCount;
 
-Update a
-Set a.IdRetirada = 2
-From misitau.dbo.Mailing a
-Where
-    IdRetirada is null
-    and Not Exists (Select 1
-                    From #DadosOrigem b
-                    Where
-                        Isnull(a.IdCarteira,b.IdCarteira) = b.IdCarteira
-                        and a.IdDevedor = b.IdDevedor);
+If Datepart(hour,@DataHoraInicio) < 8
+Begin
+
+	Update a
+	Set a.IdRetirada = 2
+	From misitau.dbo.Mailing a
+	Where
+		IdRetirada is null
+		and Not Exists (Select 1
+						From #DadosOrigem b
+						Where
+							Isnull(a.IdCarteira,b.IdCarteira) = b.IdCarteira
+							and a.IdDevedor = b.IdDevedor);
+
+end;
 
 Set @LinhasAtualizadas += @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + isnull(@LinhasAtualizadas, 0);
