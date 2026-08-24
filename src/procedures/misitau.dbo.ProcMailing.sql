@@ -1,5 +1,3 @@
-Create or Alter Procedure dbo.ProcMailing as 
-
 ------------------------------> Descrição da procedure
 
 /*
@@ -286,16 +284,21 @@ Where
 
 Set @LinhasAtualizadas = @@RowCount;
 
-Update a
-Set a.IdRetirada = 2
-From misitau.dbo.Mailing a
-Where
-    IdRetirada is null
-    and Not Exists (Select 1
-                    From #DadosOrigem b
-                    Where
-                        Isnull(a.IdCarteira,b.IdCarteira) = b.IdCarteira
-                        and a.IdDevedor = b.IdDevedor);
+If Datepart(hour,@DataHoraInicio) < 8
+Begin
+
+	Update a
+	Set a.IdRetirada = 2
+	From misitau.dbo.Mailing a
+	Where
+		IdRetirada is null
+		and Not Exists (Select 1
+						From #DadosOrigem b
+						Where
+							Isnull(a.IdCarteira,b.IdCarteira) = b.IdCarteira
+							and a.IdDevedor = b.IdDevedor);
+
+end;
 
 Set @LinhasAtualizadas += @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + isnull(@LinhasAtualizadas, 0);
