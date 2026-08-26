@@ -18,7 +18,7 @@ Create or alter Procedure dbo.ProcMailing as
     que possuem informações de retirada e foi introduzido nas linhas de insert da devolução o Set que verifica a quantidade de LinhasOrigens das 
     Devoluções para que possa entrar seus valores nas informações de Log
 
-    14/08/2026 João Henrique Cavalheiro Grillo: Foi feito uma condicional para quando for atualizada as informações na tabela
+    24/08/2026 João Henrique Cavalheiro Grillo: Foi feito uma condicional para quando for atualizada as informações na tabela
     impedindo assim que após o horário em que a tabela do time de projetos é truncada, não seja feita nenhuma atualização
     após às 20h
 */  
