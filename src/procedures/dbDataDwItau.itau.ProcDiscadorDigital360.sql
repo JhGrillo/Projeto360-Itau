@@ -1,4 +1,4 @@
-Create or Alter procedure itau.ProcDiscadorDigital360 as
+Create or Alter Procedure itau.ProcDiscadorDigital360 as 
 
 ----------------------------> Descrição da procedure
 
@@ -11,6 +11,10 @@ Create or Alter procedure itau.ProcDiscadorDigital360 as
     Atualizado por:
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+	31/08/2026 Leonardo Matheus Talarico: Foi alterado a forma como as linhas origens são contabilizadas. Agora ela é contabilizada no momento em que
+	as informações de base e discagens são cruzadas e consideramos apenas as linhas que ainda não estão na tabela de destino
+
 */
 
 ----------------------------> Definições de variaveis e controles de ambiente
@@ -159,8 +163,6 @@ Where
 	Data >= Convert(date,Getdate())
 	and Cliente in (771,777,779,799);');
 
-Set @LinhasOrigem = @@RowCount;
-
 --- | Discador digital final
 
 Insert into #DiscadorDigitalFinal (
@@ -194,7 +196,17 @@ Select
 	Chave
 From #DiscadorDigital a
 Inner join #Base b on a.CodigoReferencia = b.CodigoReferencia
-					  and a.CnpjCpf = b.CnpjCpf;
+					  and a.CnpjCpf = b.CnpjCpf
+Where
+	Not exists (Select 1
+				From
+					dbDataDwItau.itau.DiscadorDigital360 c With(nolock)
+				Where
+					b.IdDevedor = c.IdDevedor
+					and b.IdTitulo = c.IdTitulo
+					and a.Data = c.Data);
+
+Set @LinhasOrigem = @@RowCount;
 
 ------------------------------> Persistencia final
 
@@ -241,7 +253,7 @@ Where
 					and a.Data = b.Data);
 
 Set @LinhasInseridas = @@RowCount;
-Set @LinhasTotaisDestino = @LinhasInseridas;
+Set @LinhasTotaisDestino = Isnull(@LinhasInseridas, 0);
 Set @DataHoraFim = Getdate();
 
 /* Grava volumetria controles de log */
