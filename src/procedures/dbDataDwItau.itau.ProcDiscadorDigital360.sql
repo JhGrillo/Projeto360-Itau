@@ -13,7 +13,7 @@ Create or Alter Procedure itau.ProcDiscadorDigital360 as
     Descrição atualização: (Data, Atualizado por, Descrição, git)
 
 	31/08/2026 Leonardo Matheus Talarico: Foi alterado a forma como as linhas origens são contabilizadas. Agora ela é contabilizada no momento em que
-	as informações de base e discagens são cruzadas e consideramos apenas as linhas que ainda não estão na tabela de destino. 
+	as informações de base e discagens são cruzadas e consideramos apenas as linhas que ainda não estão na tabela de destino
 
 */
 
