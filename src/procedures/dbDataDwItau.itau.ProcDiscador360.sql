@@ -1,4 +1,4 @@
-Create or Alter procedure itau.ProcDiscador360 as
+Create or Alter Procedure itau.ProcDiscador360 as
 
 ----------------------------> Descrição da procedure
 
@@ -7,10 +7,16 @@ Create or Alter procedure itau.ProcDiscador360 as
     Nome: ProcDiscador360
     DataCriação: 07/08/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização:
-    Atualizado por:
+    DataAtualização: 31/08/2026
+    Atualizado por: Leonardo Matheus Talarico
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+	31/08/2026 Leonardo Matheus Talarico: Foi modificado a forma como é contabilizado as linhas Origens
+	quando carregada na tabela temporária #DiscadorFinal. Para evitar que as LinhasOrigens fosse sempre carregadas de forma absoluta
+	foi colocado um filtro onde deixamos de inserir na temporária linhas que já foram inseridas
+	na tabela de destino.
+	
 */
 
 ----------------------------> Definições de variaveis e controles de ambiente
@@ -164,8 +170,6 @@ Where
 	Inicio_discagem >= Convert(date,Getdate())
 	and Cliente in (771,777,779,799);');
 
-Set @LinhasOrigem = @@RowCount;
-
 --- | Discador final
 
 Insert into #DiscadorFinal (
@@ -205,7 +209,18 @@ Select
 	a.Chave
 From #Discador a
 Inner join #Base b on a.CodigoReferencia = b.CodigoReferencia
-					  and a.CnpjCpf = b.CnpjCpf;
+					  and a.CnpjCpf = b.CnpjCpf
+Where
+	Not exists (
+				Select 1
+				From 
+					dbDataDwItau.itau.Discador360 c With(nolock)
+				Where
+					b.IdDevedor = c.IdDevedor
+					and b.IdTitulo = c.IdTitulo
+					and a.Data = c.Data);
+
+Set @LinhasOrigem = @@RowCount;
 
 ------------------------------> Persistencia final
 
@@ -258,7 +273,7 @@ Where
 					and a.Data = b.Data);
 
 Set @LinhasInseridas = @@RowCount;
-Set @LinhasTotaisDestino = @LinhasInseridas;
+Set @LinhasTotaisDestino = isnull(@LinhasInseridas, 0);
 Set @DataHoraFim = Getdate();
 
 /* Grava volumetria controles de log */
