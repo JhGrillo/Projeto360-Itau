@@ -1,4 +1,4 @@
-Create or Alter procedure itau.ProcPagamentos360 as
+Create or Alter Procedure itau.ProcPagamentos360 as 
 
 ------------------------------> Descrição da procedure
 
@@ -12,6 +12,9 @@ Create or Alter procedure itau.ProcPagamentos360 as
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
 	17/08/2026 João Henrique Cavalheiro Grillo: Refatoramento da procedure com busca de melhoria no tempo de execução e elegebilidade do código.
+
+	31/08/2026 Leonardo Matheus Talarico: Foi feito uma alteração na procedure, onde será considerado como Origem as linhas que não estão presentes na tabela
+	de Pagamentos360, para evitar divergencia entre as linhas de origem com as de destino
 
 */
 
@@ -159,7 +162,6 @@ Inner join misitau.misitau.dbo.StatusAcordos f With(nolock) on a.IdStatusAcordo 
 Inner join misitau.misitau.dbo.OrigemAcordos g With(nolock) on a.IdAcordo = g.IdAcordo
 Where
 	d.DataPagamento >= @DataPagamento;
-	
 
 --- | Pagamentos Final
 
@@ -197,7 +199,14 @@ Select
 From #Pagamentos a
 inner join #Base b on a.IdDevedor = b.IdDevedor
 					  and a.IdTitulo = b.IdTitulo
-					  and a.DataPagamento = b.Data;
+					  and a.DataPagamento = b.Data
+Where
+	not exists (Select 1
+					From dbDataDwItau.itau.Pagamentos360 c With(nolock)
+					Where 
+						b.IdBase = c.IdBase
+						and a.IdAcordo = c.IdAcordo
+						and a.NumeroParcela = c.NumeroParcela);
 
 Set @LinhasOrigem = @@RowCount;
 
@@ -255,7 +264,7 @@ Where
 					and a.NumeroParcela = b.NumeroParcela);
 
 Set @LinhasInseridas = @@RowCount;
-Set @LinhasTotaisDestino = @LinhasInseridas;
+Set @LinhasTotaisDestino = Isnull(@LinhasInseridas, 0);
 Set @DataHoraFim = Getdate();
 
 /* Grava volumetria controles de log */
