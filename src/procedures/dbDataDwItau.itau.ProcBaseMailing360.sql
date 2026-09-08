@@ -1,4 +1,4 @@
-Create or Alter procedure itau.ProcBaseMailing360 as
+Create or Alter Procedure itau.ProcBaseMailing360 as 
 
 ----------------------------> Descrição da procedure
 
@@ -7,13 +7,15 @@ Create or Alter procedure itau.ProcBaseMailing360 as
     Nome: ProcBaseMailing360
     DataCriação: 12/08/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização: 17/08/2026
-    Atualizado por:	João Henrique Cavalheiro Grillo
+    DataAtualização: 28/08/2026
+    Atualizado por: Leonardo Matheus Talarico
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
 
-	17/08/2026 João Henrique Cavalheiro Grillo: Refatoramento da procedure para melhoria do tempo de execução, foi criado index nas origens do mailing e na Base360
-	oque melhorou significativamente o tempo de execução.
+	28/08/2026 Leonardo Matheus Talarico: Foi modificado o local onde é contabilizado o carregamento das linhas origens e a forma como é carregado a Base dentro da temporária
+	#Base360, considerando apenas os IDs Bases que ainda não foram adicionados na tabela da BaseMailing360. Foi feito isso para evitar que existissem linhas carregadas de Origem,
+	mas que não houvessem Linhas Inseridas e Atualizadas nas contagens.
+
 */
 
 ----------------------------> Definições de variaveis e controles de ambiente
@@ -97,9 +99,15 @@ Select
 	CodigoReferencia,
 	IdDevedor,
 	IdTitulo
-From dbDataDwItau.itau.Base360 With(nolock)
+From dbDataDwItau.itau.Base360 a With(nolock)
 Where
-	Data >= Convert(date,Getdate());
+	Data >= Convert(date,Getdate())
+	and Not Exists (Select 1 
+					From 
+						dbDataDwItau.itau.BaseMailing360 b With(nolock) 
+					Where 
+						a.IdBase = b.IdBase
+					);
 
 /*
 	Criação de index não clusterizado
@@ -123,8 +131,6 @@ Select
 	a.IdRetirada
 From misitau.misitau.dbo.Mailing a With(nolock)
 Inner join misitau.misitau.dbo.Carteiras b With(nolock) on a.IdCarteira = b.IdCarteira;
-
-Set @LinhasOrigem += @@RowCount;
 
 /*
 	Criação de index não clusterizado
@@ -151,6 +157,8 @@ Select
 From #Mailing a
 Inner join #Base b on a.IdDevedor = b.IdDevedor
 				      and a.CodigoReferencia = b.CodigoReferencia;
+
+Set @LinhasOrigem = @@RowCount;
 
 /*
 	Criação de index não clusterizado

@@ -1,4 +1,4 @@
-Create or Alter procedure itau.ProcBase360 as
+Create or Alter Procedure itau.ProcBase360 as 
 
 ------------------------------> Descrição da procedure
 
@@ -7,19 +7,23 @@ Create or Alter procedure itau.ProcBase360 as
     Nome: ProcBase360
     DataCriação: 06/08/2026
     Criado por: Leonardo Matheus Talarico
-    DataAtualização: 14/08/2026
-    Atualizado por: João Henrique Cavalheiro Grillo
+    DataAtualização: 26/08/2026
+    Atualizado por: Leonardo Matheus Talarico
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
 
 	14/08/2026 João Henrique Cavalheiro Grillo: Refatorado o processo para melhoria de performance e elegibilidade de código, agora todas as tratativas são realizadas diretamento em cross aply,
 	economizando o custo da consulta ao inves de realizar diversos updates ao longo da procedure.
 
+	26/08/2026 Leonardo Matheus Talarico: Foi modificado a forma que é inserido as infromações na temporária #Base360, pois era contado em todos os processos a quantidade total de linhas de dentro da 
+	misitau.dbo.Base, mas ao contabilizar as linhas inseridas ou atualizadas na tabela física, as informações eram diferentes, já que no primeiro processo todas as linhas já haviam sido inseridas
+	o que faria que só houvesse mudanças nas suas atualizações que não acompanham as linhas de origem
+
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
 
-Set Nocount On;
+Set Nocount on;
 
 Declare @NomeProcedure varchar(128) = 'ProcBase360',
         @Etapa varchar(100) = 'Inicio',
@@ -46,10 +50,9 @@ Begin Try
 
 ------------------------------> Criacao de tabelas temporarias
 
-Set @Etapa = 'Criacao das tabelas temporarias';
+Set @Etapa = 'Carga das tabelas temporarias';
 
 --- | Base360
-
 If Object_id('Tempdb..#Base360') Is not null Drop table #Base360;
 Create table #Base360 (
 	Data datetime,
@@ -76,38 +79,11 @@ Create table #Base360 (
 	IdRetirada int
 );
 
-------------------------------> Carga das tabelas temporarias
-
-Set @Etapa = 'Carga das tabelas temporarias';
-
 --- | Base360
 
-
-Insert into #Base360 (
-					Data,
-					CodigoReferencia,
-					Carteira,
-					Produto,
-					SubProduto,
-					Cluster,
-					IdDevedor,
-					CnpjCpf,
-					IdTitulo,
-					NumeroContrato,
-					RazaoSocialNome,
-					Plano,
-					NumeroParcela,
-					DataInclusao,
-					DataVencimento,
-					DiasEmAtraso,
-					FaixaAtraso,
-					Risco,
-					SaldoVencido,
-					ValorRegularizacao,
-					FaixaValor
-				   )
+With  BaseCTE as (
 Select
-	Convert(date,@DataHoraInicio) as Data,
+	Convert(date,Getdate()) as Data,
 	CodigoReferencia,
 	Carteira,
 	Produto,
@@ -134,7 +110,7 @@ Cross Apply (Select
 					When AreaNegocio in ('02', '2', '11') then 'NCOR'
 					When AreaNegocio in ('01', '1')		  then 'BPF'
 				end as SubProduto,
-				Datediff(day,DataVencimento,@DataHoraInicio) as DiasEmAtraso,
+				Datediff(day,DataVencimento, Getdate()) as DiasEmAtraso,
 				Case 
 					When Coalesce(ValorRegularizacao, Risco) <= 500		then '01. 0 a 500'
 					When Coalesce(ValorRegularizacao, Risco) <= 1000	then '02. 501 a 1000'
@@ -180,7 +156,157 @@ Cross Apply (Select
 						end
 					else '00. Sem faixa'
 				end as FaixaAtraso
-			) as CalculosB;
+			) as CalculosB
+), 
+
+NovaBaseCTE as (
+	Select 
+		a.Data,
+		a.CodigoReferencia,
+		a.Carteira,
+		a.Produto,
+		a.SubProduto,
+		a.Cluster,
+		a.IdDevedor,
+		a.CnpjCpf,
+		a.IdTitulo,
+		a.NumeroContrato,
+		a.RazaoSocialNome,
+		a.Plano,
+		a.NumeroParcela,
+		a.DataInclusao,
+		a.DataVencimento,
+		a.DiasEmAtraso,
+		a.FaixaAtraso,
+		a.Risco,
+		a.SaldoVencido,
+		a.ValorRegularizacao,
+		a.FaixaValor
+	From BaseCTE a
+	Where 
+		Not Exists (Select 1
+					From dbDataDwItau.itau.Base360 b With(nolock)
+					Where
+						a.IdDevedor = b.IdDevedor
+						and a.IdTitulo = b.IdTitulo
+						and a.Data = b.Data)
+
+	Union 
+
+	Select 
+		a.Data,
+		a.CodigoReferencia,
+		a.Carteira,
+		a.Produto,
+		a.SubProduto,
+		a.Cluster,
+		a.IdDevedor,
+		a.CnpjCpf,
+		a.IdTitulo,
+		a.NumeroContrato,
+		a.RazaoSocialNome,
+		a.Plano,
+		a.NumeroParcela,
+		a.DataInclusao,
+		a.DataVencimento,
+		a.DiasEmAtraso,
+		a.FaixaAtraso,
+		a.Risco,
+		a.SaldoVencido,
+		a.ValorRegularizacao,
+		a.FaixaValor
+	From BaseCTE a
+	inner join dbDataDwItau.itau.Base360 b With(nolock) on a.IdDevedor = b.IdDevedor
+														   and a.IdTitulo = b.IdTitulo
+														   and a.Data = b.Data
+														   
+	Where 
+		Isnull(a.NumeroParcela,'') <> Isnull(b.NumeroParcela,'')
+		or Isnull(a.DataInclusao,'1900-01-01') <> Isnull(b.DataInclusao,'1900-01-01')
+		or Isnull(a.DiasEmAtraso,-1) <> Isnull(b.DiasEmAtraso,-1)
+		or Isnull(a.Risco,'') <> Isnull(b.Risco,'')
+		or Isnull(a.SaldoVencido,'') <> Isnull(b.SaldoVencido,'')
+		or Isnull(a.ValorRegularizacao,'') <> Isnull(b.ValorRegularizacao,'')
+		
+	Union
+	
+		Select
+			a.Data,
+			a.CodigoReferencia,
+			a.Carteira,
+			a.Produto,
+			a.SubProduto,
+			a.Cluster,
+			a.IdDevedor,
+			a.CnpjCpf,
+			a.IdTitulo,
+			a.NumeroContrato,
+			a.RazaoSocialNome,
+			a.Plano,
+			a.NumeroParcela,
+			a.DataInclusao,
+			a.DataVencimento,
+			a.DiasEmAtraso,
+			a.FaixaAtraso,
+			a.Risco,
+			a.SaldoVencido,
+			a.ValorRegularizacao,
+			a.FaixaValor
+		From dbDataDwItau.itau.Base360 a With(nolock)
+		left join BaseCTE b on a.IdDevedor = b.IdDevedor
+								and a.IdTitulo = b.IdTitulo
+								and a.Data = b.Data
+		Where
+			a.Data >= Convert(date,Getdate())
+			and b.IdDevedor is null
+			and a.IdRetirada is null
+)
+Insert into #Base360 (
+					Data,
+					CodigoReferencia,
+					Carteira,
+					Produto,
+					SubProduto,
+					Cluster,
+					IdDevedor,
+					CnpjCpf,
+					IdTitulo,
+					NumeroContrato,
+					RazaoSocialNome,
+					Plano,
+					NumeroParcela,
+					DataInclusao,
+					DataVencimento,
+					DiasEmAtraso,
+					FaixaAtraso,
+					Risco,
+					SaldoVencido,
+					ValorRegularizacao,
+					FaixaValor
+				   )
+Select
+	a.Data,
+		a.CodigoReferencia,
+		a.Carteira,
+		a.Produto,
+		a.SubProduto,
+		a.Cluster,
+		a.IdDevedor,
+		a.CnpjCpf,
+		a.IdTitulo,
+		a.NumeroContrato,
+		a.RazaoSocialNome,
+		a.Plano,
+		a.NumeroParcela,
+		a.DataInclusao,
+		a.DataVencimento,
+		a.DiasEmAtraso,
+		a.FaixaAtraso,
+		a.Risco,
+		a.SaldoVencido,
+		a.ValorRegularizacao,
+		a.FaixaValor
+From NovaBaseCTE a;
 
 Set @LinhasOrigem = @@RowCount;
 
@@ -247,10 +373,6 @@ Where
 
 Set @LinhasInseridas = @@RowCount;
 
-------------------------------> Atualizacao de dados
-
-Set @Etapa = 'Atualizacao de dados';
-
 --- | Atualiza campos da tabela fisica
 
 /* Atualiza campos que tiveram alterações em seu contrato */
@@ -272,8 +394,8 @@ inner join #Base360 b on a.IdDevedor = b.IdDevedor
 						 and a.Data = b.Data
 Where
 	Isnull(a.NumeroParcela,'') <> Isnull(b.NumeroParcela,'')
-	or Isnull(a.DataInclusao,'') <> Isnull(b.DataInclusao,'')
-	or Isnull(a.DiasEmAtraso,'') <> Isnull(b.DiasEmAtraso,'')
+	or Isnull(a.DataInclusao,'1900-01-01') <> Isnull(b.DataInclusao,'1900-01-01')
+	or Isnull(a.DiasEmAtraso,-1) <> Isnull(b.DiasEmAtraso,-1)
 	or Isnull(a.Risco,'') <> Isnull(b.Risco,'')
 	or Isnull(a.SaldoVencido,'') <> Isnull(b.SaldoVencido,'')
 	or Isnull(a.ValorRegularizacao,'') <> Isnull(b.ValorRegularizacao,'');
@@ -285,7 +407,7 @@ Set @LinhasAtualizadas = @@RowCount;
 Update a
 Set a.IdRetirada = 1
 From dbDataDwItau.itau.Base360 a With(nolock)
-Left join #Base360 b on a.IdDevedor = b.IdDevedor
+left join #Base360 b on a.IdDevedor = b.IdDevedor
 					    and a.IdTitulo = b.IdTitulo
 						and a.Data = b.Data
 Where

@@ -1,19 +1,27 @@
-Create or Alter procedure dbo.ProcMailing as
+Create or alter Procedure dbo.ProcMailing as 
 
 ------------------------------> Descrição da procedure
 
 /*
     Padrão de escrita: PascalCase
-    Nome: ProcAcordosParcelasPagar
+    Nome: ProcMailing
     DataCriação: 03/08/2026
     Criado por: Leonardo Matheus Talarico
-    DataAtualização: 12/08/2026
-    Atualizado por: João Henrique Cavalheiro Grillo
+    DataAtualização: 18/08/2026
+    Atualizado por: Leonardo Matheus Talarico
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
 
     12/08/2026 João Henrique Cavalheiro Grillo: Foi incrementado a regra de bloqueios utilizada no itau espelhando a regra da procedure de projetos.
-*/
+
+    18/08/2026 Leonardo Matheus Talarico: Foi modificado a forma como as devoluções são carregadas, desconsiderando totalmente informações da base 
+    que possuem informações de retirada e foi introduzido nas linhas de insert da devolução o Set que verifica a quantidade de LinhasOrigens das 
+    Devoluções para que possa entrar seus valores nas informações de Log
+
+    24/08/2026 João Henrique Cavalheiro Grillo: Foi feito uma condicional para quando for atualizada as informações na tabela
+    impedindo assim que após o horário em que a tabela do time de projetos é truncada, não seja feita nenhuma atualização
+    após às 20h
+*/  
 
 ------------------------------> Definições de variaveis e controles de ambiente
 
@@ -32,7 +40,7 @@ Declare @NomeProcedure varchar(128) = 'ProcMailing',
         @NumeroErro int,
         @LinhaErro int;
 
-/* Inicia o controle de logs */
+--/* Inicia o controle de logs */
 Exec misitau.[log].ProcControles
     @TipoLog = 'Execucao',
     @NomeProcedure = @NomeProcedure,
@@ -136,7 +144,15 @@ Where
                 From AtivosCTE b
                 Where
                     a.IdCarteira = b.IdCarteira
-                    and a.IdDevedor = b.IdDevedor);
+                    and a.IdDevedor = b.IdDevedor)
+    and Exists (Select 1
+                From misitau.dbo.Mailing c With(nolock)
+                Where 
+                    a.IdCarteira = c.IdCarteira
+                    and a.IdDevedor = c.IdDevedor
+                    and c.IdRetirada is null);
+
+Set @LinhasOrigem = @@RowCount;
 
 --- | Ocorrências
 
@@ -188,10 +204,18 @@ Insert into #Devolucoes (
 Select
     IdCarteira,
     IdDevedor
-From #OcorrenciasDevolucoes
+From #OcorrenciasDevolucoes a
 Where
-    Complemento in ('Colchão','Remessa')
-    or Complemento like '%BAIXA PGTO DO / DT PGTO%';
+    (Complemento in ('Colchão','Remessa')
+    or Complemento like '%BAIXA PGTO DO / DT PGTO%')
+    and Exists (Select 1
+                From misitau.dbo.Mailing c With(nolock)
+                Where
+                    a.IdCarteira = c.IdCarteira
+                    and a.IdDevedor = c.IdDevedor
+                    and c.IdRetirada is null);
+
+Set @LinhasOrigem += @@RowCount;
 
 --- | Mailing
 
@@ -210,7 +234,7 @@ Where
                     a.IdDevedor = b.IdDevedor
                     and a.IdCarteira = b.IdCarteira);
 
-Set @LinhasOrigem = @@RowCount;
+Set @LinhasOrigem += @@RowCount;
 
 ------------------------------> Criacao de índices
 
@@ -266,15 +290,21 @@ Where
 
 Set @LinhasAtualizadas = @@RowCount;
 
-Update a
-Set a.IdRetirada = 2
-From misitau.dbo.Mailing a
-WHere
-    Not Exists (Select 1
-                From #DadosOrigem b
-                Where
-                    Isnull(a.IdCarteira,b.IdCarteira) = b.IdCarteira
-                    and a.IdDevedor = b.IdDevedor);
+If Datepart(hour,@DataHoraInicio) < 8
+Begin
+
+	Update a
+	Set a.IdRetirada = 2
+	From misitau.dbo.Mailing a
+	Where
+		IdRetirada is null
+		and Not Exists (Select 1
+						From #DadosOrigem b
+						Where
+							Isnull(a.IdCarteira,b.IdCarteira) = b.IdCarteira
+							and a.IdDevedor = b.IdDevedor);
+
+end;
 
 Set @LinhasAtualizadas += @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + isnull(@LinhasAtualizadas, 0);
