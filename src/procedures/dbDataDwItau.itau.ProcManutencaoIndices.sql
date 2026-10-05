@@ -1,4 +1,4 @@
-Create or Alter procedure [dbo].[ProcManutencaoIndices] as
+Create or Alter Procedure [itau].[ProcManutencaoIndices] as
 
 ------------------------------> Descrição da procedure
 
@@ -7,49 +7,47 @@ Create or Alter procedure [dbo].[ProcManutencaoIndices] as
 	Nome: ProcManutencaoIndices
 	DataCriação: 22/07/2026
 	Criado por: João Henrique Cavalheiro Grillo
-	DataAtualização: 06/08/2026
-	Atualizado por: João Henrique Cavalheiro Grillo
+	DataAtualização: 05/10/2026
+	Atualizado por: Leonardo Matheus Talarico
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
+
     06/08/2026 João Henrique Cavalheiro Grillo: O processo não estava marcando concluído no log
     quando não havia nenhuma tabela para fazer manutenção, pois o Exec estava dentro do While contador de tabelas.
 
-	05/10/2026 Leonardo Matheus Talarico: Foi adicionado um Update Statistics Fullscan para as fragmentações maiores que 5.0 e menores que 30.0
+	05/10/2026 Leonardo Matheus Talarico:: Foi adicionado um Update Statistics Fullscan para as fragmentações maiores que 5.0 e menores que 30.0
 
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
 
-Set Nocount On;
-
 Declare @NomeProcedure varchar(128) = 'ProcManutencaoIndices',
-        @Etapa varchar(100) = 'Inicio',
-        @IdExecucao int,
-        @DataHoraInicio datetime = Dateadd(hour,-3,Getdate()),
-        @DataHoraFim datetime,
-        @MensagemErro varchar(max),
-        @NumeroErro int,
-        @LinhaErro int,
-        @Contador int,
-        @Id int = 1,
-        @SchemaTabela varchar(64),
-        @NomeTabela varchar(64),
-        @NomeIndex varchar(128),
-        @Fragmentacao decimal(5,2),
-        @SQL nvarchar(max);
-
+		@Etapa varchar(100) = 'Inicio',
+		@IdExecucao int, 
+		@DataHoraInicio datetime = Getdate(),
+		@DataHoraFim datetime,
+		@MensagemErro varchar(max),
+		@NumeroErro int,
+		@LinhaErro int,
+		@Contador int,
+		@Id int = 1,
+		@SchemaTabela varchar(64),
+		@NomeTabela varchar(64),
+		@NomeIndex varchar(128),
+		@Fragmentacao decimal(5,2),
+		@SQL nvarchar(max);
 
 /* Inicia o controle de logs */
-Exec misitau.[log].ProcControles
-    @TipoLog = 'Execucao',
-    @NomeProcedure = @NomeProcedure,
-    @DataHoraInicio = @DataHoraInicio,
-    @StatusExecucao = 'Executando',
-    @IdExecucao = @IdExecucao OUTPUT;
+Exec dbDataDwItau.[log].ProcControles
+	@TipoLog = 'Execucao',
+	@NomeProcedure = @NomeProcedure,
+	@DataHoraInicio = @DataHoraInicio,
+	@StatusExecucao = 'Executando',
+	@IdExecucao = @IdExecucao OUTPUT;
 
 Begin Try
 
-------------------------------> Criacao de tabelas temporarias
+---------------------------> Criacao de tabelas temporarias
 
 Set @Etapa = 'Criacao das tabelas temporarias';
 
@@ -70,22 +68,22 @@ Set @Etapa = 'Carga das tabelas temporarias';
 --- | Insere as informações de tabelas
 
 Insert into #Tabelas
-Select 
-    b.Name as SchemaTabela,
-    a.Name as NomeTabela,
-    c.Name as NomeIndex,
-    d.avg_fragmentation_in_percent as Fragmentacao
+Select
+	b.Name as SchemaTabela,
+	a.Name as NomeTabela,
+	c.Name as NomeIndex,
+	d.avg_fragmentation_in_percent as Fragmentacao
 From sys.tables a With(nolock)
 Inner Join sys.schemas b With(nolock) On a.schema_id = b.schema_id
 Inner Join sys.indexes c With(nolock) On a.object_id = c.object_id
 Cross Apply sys.dm_db_index_physical_stats(db_id(), a.object_id, c.index_id, null, 'Limited') d
-Where 
-    a.is_ms_shipped = 0
-    and c.index_id > 0
-    and d.avg_fragmentation_in_percent >= 5.0
-    and d.page_count > 1000; -- Ignora índices pequenos (< 8MB)
+Where
+	a.is_ms_shipped = 0
+	and c.index_id > 0
+	and d.avg_fragmentation_in_percent >= 5.0
+	and d.page_count > 1000; -- Ignora indices pequenos (< 8MB)
 
-------------------------------> Manutencao de indices
+---------------------------> Manutencao de indices
 
 Set @Etapa = 'Manutencao de indices';
 
@@ -94,16 +92,16 @@ Set @Contador = (Select Count(IdTabela) From #Tabelas);
 While @Id <= @Contador
 Begin
 
-    Select
-        @SchemaTabela = SchemaTabela,
-        @NomeTabela = NomeTabela,
-        @NomeIndex = NomeIndex,
-        @Fragmentacao = Fragmentacao
-    From #Tabelas
-    Where  
-        IdTabela = @Id;
+	Select
+		@SchemaTabela = SchemaTabela,
+		@NomeTabela = NomeTabela,
+		@NomeIndex = NomeIndex,
+		@Fragmentacao = Fragmentacao
+	From #Tabelas
+	Where
+		IdTabela = @Id;
 
-    If @Fragmentacao >= 30.0
+	If @Fragmentacao >= 30.0
 	Begin
 		Set @SQL = N'Alter Index ' + Quotename(@NomeIndex) + N' On ' + Quotename(@SchemaTabela) + N'.' + Quotename(@NomeTabela) + N' Rebuild With(Online=Off);';
 		Exec sp_executesql @SQL;
@@ -117,42 +115,42 @@ Begin
 		Exec sp_executesql @SQL;
 	End;
 
-    Set @Id += 1;
+	Set @Id += 1;
 
 End;
 
-Set @DataHoraFim = Dateadd(hour,-3,Getdate());
+Set @DataHoraFim = Dateadd(hour,-3, Getdate());
 
 /* Finaliza execução controles de log concluido */
-Exec misitau.[log].ProcControles
-    @TipoLog = 'Atualizacao',
-    @IdExecucao = @IdExecucao,
-    @DataHoraFim = @DataHoraFim,
-    @StatusExecucao = 'Concluida';
+Exec dbDataDwItau.[log].ProcControles
+	@TipoLog = 'Atualizacao',
+	@IdExecucao = @IdExecucao,
+	@DataHoraFim = @DataHoraFim,
+	@StatusExecucao = 'Concluida';
 
 End try
 Begin catch
 
-Set @MensagemErro = Error_message();
+Set @MensagemErro = ERROR_MESSAGE();
 Set @NumeroErro = Error_number();
 Set @LinhaErro = Error_line()
 
 /* Finalizacao execução de log erro */
 Set @DataHoraFim = Dateadd(hour,-3,Getdate());
-Exec misitau.[log].ProcControles
-    @TipoLog = 'Atualizacao',
-    @IdExecucao = @IdExecucao,
-    @DataHoraFim = @DataHoraFim,
-    @StatusExecucao = 'Erro';
+Exec dbDataDwItau.[log].ProcControles
+	@TipoLog = 'Atualizacao',
+	@IdExecucao = @IdExecucao,
+	@DataHoraFim = @DataHoraFim,
+	@StatusExecucao = 'Erro';
 
 /* Execução log erro */
-Exec misitau.[log].ProcControles
-    @TipoLog = 'Erro',
-    @IdExecucao = @IdExecucao,
-    @NomeProcedure = @NomeProcedure,
-    @MensagemErro = @MensagemErro,
-    @NumeroErro = @NumeroErro,
-    @LinhaErro = @LinhaErro,
-    @EtapaErro = @Etapa;
+Exec dbDataDwItau.[log].ProcControles
+	@TipoLog = 'Erro',
+	@IdExecucao = @IdExecucao,
+	@NomeProcedure = @NomeProcedure,
+	@MensagemErro = @MensagemErro,
+	@NumeroErro = @NumeroErro,
+	@LinhaErro = @LinhaErro,
+	@EtapaErro = @Etapa;
 
 End Catch;
