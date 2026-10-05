@@ -1,3 +1,4 @@
+
 Create or Alter Procedure itau.ProcBase360 as 
 
 ------------------------------> Descrição da procedure
@@ -7,7 +8,7 @@ Create or Alter Procedure itau.ProcBase360 as
     Nome: ProcBase360
     DataCriação: 06/08/2026
     Criado por: Leonardo Matheus Talarico
-    DataAtualização: 26/08/2026
+    DataAtualização: 02/10/2026
     Atualizado por: Leonardo Matheus Talarico
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
@@ -19,6 +20,13 @@ Create or Alter Procedure itau.ProcBase360 as
 	misitau.dbo.Base, mas ao contabilizar as linhas inseridas ou atualizadas na tabela física, as informações eram diferentes, já que no primeiro processo todas as linhas já haviam sido inseridas
 	o que faria que só houvesse mudanças nas suas atualizações que não acompanham as linhas de origem
 
+	04/09/2026 Leonardo Matheus Talarico e João Henrique Cavalheiro Grillo: Refatorado a forma de carregamento, onde é armazenado todos os dados em uma tabela origem, e inserido na tabela final temporaria apenas
+	casos que serão atualizados ou novos inseridos.
+
+	02/10/2026 Leonardo Matheus Talarico: Foi adicionado dentro do codigo um trecho que verificará a média da volumetria das últimas atualizações e
+    também a máxima volumetria dos ultimos 3 meses diariamente. Caso a quantidade de Linhas atualizadas e inseridas na tabela final for maior que
+    as atualizações recentes e também maior que 75% do que a média histórica, é lido somente 10% da tabela de destino e é recalculado a distribuição
+    dos dados ao atualizar as métricas do otimizador de consultas
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -28,6 +36,8 @@ Set Nocount on;
 Declare @NomeProcedure varchar(128) = 'ProcBase360',
         @Etapa varchar(100) = 'Inicio',
         @IdExecucao int,
+		@MediaUltimasExecucoes int,
+        @MediaVolumetria int,
         @LinhasOrigem int,
         @LinhasInseridas int,
         @LinhasAtualizadas int,
@@ -50,9 +60,37 @@ Begin Try
 
 ------------------------------> Criacao de tabelas temporarias
 
-Set @Etapa = 'Carga das tabelas temporarias';
+Set @Etapa = 'Criação das tabelas temporarias';
+
+--- | Dados origem
+
+If Object_id('Tempdb..#DadosOrigem') Is not null Drop table #DadosOrigem;
+Create table #DadosOrigem (
+	Data datetime,
+	CodigoReferencia smallint,
+	Carteira varchar(64),
+	Produto varchar(64),
+	SubProduto varchar(64),
+	Cluster varchar(4),
+	IdDevedor int,
+	CnpjCpf varchar(14),
+	IdTitulo int,
+	NumeroContrato varchar(32),
+	RazaoSocialNome varchar(128),
+	Plano smallint,
+	NumeroParcela smallint,
+	DataInclusao datetime,
+	DataVencimento datetime,
+	DiasEmAtraso int,
+	FaixaAtraso varchar(32),
+	Risco money,
+	SaldoVencido money,
+	ValorRegularizacao money,
+	FaixaValor varchar(32)
+);
 
 --- | Base360
+
 If Object_id('Tempdb..#Base360') Is not null Drop table #Base360;
 Create table #Base360 (
 	Data datetime,
@@ -75,13 +113,38 @@ Create table #Base360 (
 	Risco money,
 	SaldoVencido money,
 	ValorRegularizacao money,
-	FaixaValor varchar(32),
-	IdRetirada int
+	FaixaValor varchar(32)
 );
 
---- | Base360
+------------------------------> Carga de tabelas temporarias
 
-With  BaseCTE as (
+Set @Etapa = 'Carga das tabelas temporarias';
+
+--- | Dados origem
+
+Insert into #DadosOrigem (
+					Data,
+					CodigoReferencia,
+					Carteira,
+					Produto,
+					SubProduto,
+					Cluster,
+					IdDevedor,
+					CnpjCpf,
+					IdTitulo,
+					NumeroContrato,
+					RazaoSocialNome,
+					Plano,
+					NumeroParcela,
+					DataInclusao,
+					DataVencimento,
+					DiasEmAtraso,
+					FaixaAtraso,
+					Risco,
+					SaldoVencido,
+					ValorRegularizacao,
+					FaixaValor
+				   )
 Select
 	Convert(date,Getdate()) as Data,
 	CodigoReferencia,
@@ -156,111 +219,10 @@ Cross Apply (Select
 						end
 					else '00. Sem faixa'
 				end as FaixaAtraso
-			) as CalculosB
-), 
+			) as CalculosB;
 
-NovaBaseCTE as (
-	Select 
-		a.Data,
-		a.CodigoReferencia,
-		a.Carteira,
-		a.Produto,
-		a.SubProduto,
-		a.Cluster,
-		a.IdDevedor,
-		a.CnpjCpf,
-		a.IdTitulo,
-		a.NumeroContrato,
-		a.RazaoSocialNome,
-		a.Plano,
-		a.NumeroParcela,
-		a.DataInclusao,
-		a.DataVencimento,
-		a.DiasEmAtraso,
-		a.FaixaAtraso,
-		a.Risco,
-		a.SaldoVencido,
-		a.ValorRegularizacao,
-		a.FaixaValor
-	From BaseCTE a
-	Where 
-		Not Exists (Select 1
-					From dbDataDwItau.itau.Base360 b With(nolock)
-					Where
-						a.IdDevedor = b.IdDevedor
-						and a.IdTitulo = b.IdTitulo
-						and a.Data = b.Data)
+--- | Base360
 
-	Union 
-
-	Select 
-		a.Data,
-		a.CodigoReferencia,
-		a.Carteira,
-		a.Produto,
-		a.SubProduto,
-		a.Cluster,
-		a.IdDevedor,
-		a.CnpjCpf,
-		a.IdTitulo,
-		a.NumeroContrato,
-		a.RazaoSocialNome,
-		a.Plano,
-		a.NumeroParcela,
-		a.DataInclusao,
-		a.DataVencimento,
-		a.DiasEmAtraso,
-		a.FaixaAtraso,
-		a.Risco,
-		a.SaldoVencido,
-		a.ValorRegularizacao,
-		a.FaixaValor
-	From BaseCTE a
-	inner join dbDataDwItau.itau.Base360 b With(nolock) on a.IdDevedor = b.IdDevedor
-														   and a.IdTitulo = b.IdTitulo
-														   and a.Data = b.Data
-														   
-	Where 
-		Isnull(a.NumeroParcela,'') <> Isnull(b.NumeroParcela,'')
-		or Isnull(a.DataInclusao,'1900-01-01') <> Isnull(b.DataInclusao,'1900-01-01')
-		or Isnull(a.DiasEmAtraso,-1) <> Isnull(b.DiasEmAtraso,-1)
-		or Isnull(a.Risco,'') <> Isnull(b.Risco,'')
-		or Isnull(a.SaldoVencido,'') <> Isnull(b.SaldoVencido,'')
-		or Isnull(a.ValorRegularizacao,'') <> Isnull(b.ValorRegularizacao,'')
-		
-	Union
-	
-		Select
-			a.Data,
-			a.CodigoReferencia,
-			a.Carteira,
-			a.Produto,
-			a.SubProduto,
-			a.Cluster,
-			a.IdDevedor,
-			a.CnpjCpf,
-			a.IdTitulo,
-			a.NumeroContrato,
-			a.RazaoSocialNome,
-			a.Plano,
-			a.NumeroParcela,
-			a.DataInclusao,
-			a.DataVencimento,
-			a.DiasEmAtraso,
-			a.FaixaAtraso,
-			a.Risco,
-			a.SaldoVencido,
-			a.ValorRegularizacao,
-			a.FaixaValor
-		From dbDataDwItau.itau.Base360 a With(nolock)
-		left join BaseCTE b on a.IdDevedor = b.IdDevedor
-								and a.IdTitulo = b.IdTitulo
-								and a.Data = b.Data
-		Where
-			a.Data >= Convert(date,Getdate())
-			and b.IdDevedor is null
-			and a.IdRetirada is null
-)
 Insert into #Base360 (
 					Data,
 					CodigoReferencia,
@@ -285,28 +247,41 @@ Insert into #Base360 (
 					FaixaValor
 				   )
 Select
-	a.Data,
-		a.CodigoReferencia,
-		a.Carteira,
-		a.Produto,
-		a.SubProduto,
-		a.Cluster,
-		a.IdDevedor,
-		a.CnpjCpf,
-		a.IdTitulo,
-		a.NumeroContrato,
-		a.RazaoSocialNome,
-		a.Plano,
-		a.NumeroParcela,
-		a.DataInclusao,
-		a.DataVencimento,
-		a.DiasEmAtraso,
-		a.FaixaAtraso,
-		a.Risco,
-		a.SaldoVencido,
-		a.ValorRegularizacao,
-		a.FaixaValor
-From NovaBaseCTE a;
+	Data,
+	CodigoReferencia,
+	Carteira,
+	Produto,
+	SubProduto,
+	Cluster,
+	IdDevedor,
+	CnpjCpf,
+	IdTitulo,
+	NumeroContrato,
+	RazaoSocialNome,
+	Plano,
+	NumeroParcela,
+	DataInclusao,
+	DataVencimento,
+	DiasEmAtraso,
+	FaixaAtraso,
+	Risco,
+	SaldoVencido,
+	ValorRegularizacao,
+	FaixaValor
+From #DadosOrigem a With(nolock)
+Where
+	Not exists (Select 1
+				From dbDataDwItau.itau.Base360 b With(nolock)
+				Where
+					a.IdDevedor = b.IdDevedor
+					and a.IdTitulo = b.IdTitulo
+					and Convert(date, a.Data) = Convert(date, b.Data)
+					and Isnull(a.NumeroParcela,-1) = Isnull(b.NumeroParcela,-1)
+					and Isnull(a.DataInclusao,'1900-01-01') = Isnull(b.DataInclusao,'1900-01-01')
+					and Isnull(a.DiasEmAtraso,-1) = Isnull(b.DiasEmAtraso,-1)
+					and Isnull(a.Risco,-1) = Isnull(b.Risco,-1)
+					and Isnull(a.SaldoVencido,-1) = Isnull(b.SaldoVencido,-1)
+					and Isnull(a.ValorRegularizacao,-1) = Isnull(b.ValorRegularizacao,-1));
 
 Set @LinhasOrigem = @@RowCount;
 
@@ -369,7 +344,7 @@ Where
 				Where
 					a.IdDevedor = b.IdDevedor
 					and a.IdTitulo = b.IdTitulo
-					and a.Data = b.Data);
+					and Convert(date, a.Data) = Convert(date, b.Data));
 
 Set @LinhasInseridas = @@RowCount;
 
@@ -391,7 +366,7 @@ Set a.Plano = b.Plano,
 From dbDataDwItau.itau.Base360 a With(nolock)
 inner join #Base360 b on a.IdDevedor = b.IdDevedor
 					     and a.IdTitulo = b.IdTitulo
-						 and a.Data = b.Data
+						 and Convert(date, a.Data) = Convert(date, b.Data)
 Where
 	Isnull(a.NumeroParcela,'') <> Isnull(b.NumeroParcela,'')
 	or Isnull(a.DataInclusao,'1900-01-01') <> Isnull(b.DataInclusao,'1900-01-01')
@@ -400,7 +375,7 @@ Where
 	or Isnull(a.SaldoVencido,'') <> Isnull(b.SaldoVencido,'')
 	or Isnull(a.ValorRegularizacao,'') <> Isnull(b.ValorRegularizacao,'');
 
-Set @LinhasAtualizadas = @@RowCount;
+Set @LinhasAtualizadas = isnull(@@RowCount,0);
 
 /* Marcação de contratos devolvidos/retirados */
 
@@ -409,21 +384,48 @@ Set a.IdRetirada = 1
 From dbDataDwItau.itau.Base360 a With(nolock)
 left join #Base360 b on a.IdDevedor = b.IdDevedor
 					    and a.IdTitulo = b.IdTitulo
-						and a.Data = b.Data
+						and Convert(date, a.Data) = Convert(date, b.Data)
 Where
 	a.Data >= Convert(date,Getdate())
 	and b.IdDevedor is null
 	and a.IdRetirada is null;
 
-Set @LinhasAtualizadas += @@RowCount;
-Set @LinhasTotaisDestino = @LinhasInseridas + isnull(@LinhasAtualizadas, 0);
+Set @LinhasTotaisDestino = @LinhasInseridas + @LinhasAtualizadas;
+
+Set @MediaUltimasExecucoes = (Select 
+                                avg (LinhasTotaisDestino)
+                              From (Select top 10
+										LinhasTotaisDestino
+                                    From dbDataDwItau.log.ControleVolumes With(nolock)
+                                    Where   
+                                        NomeTabelaDestino = 'itau.Base360'
+                                    Order by
+                                        IdControleVolume desc) a);
+
+Set @MediaVolumetria = (Select
+							avg (LinhasTotaisDestino)
+						From (Select
+								Max(LinhasTotaisDestino) as LinhasTotaisDestino
+							  From
+								dbDataDwItau.log.ControleVolumes With(nolock)
+							  Where
+								NomeTabelaDestino = 'itau.Base360'
+							  Group by
+								Convert(date, DataExecucao)) a);
+
+If @LinhasTotaisDestino > @MediaUltimasExecucoes and @LinhasTotaisDestino >= @MediaVolumetria * 0.75
+Begin
+    Update Statistics dbDataDwItau.itau.Base360 With Sample 10 Percent;
+End;
+
+
 Set @DataHoraFim = Getdate();
 
 /* Grava volumetria controles de log */
 Exec dbDataDwItau.[log].ProcControles
     @TipoLog = 'Volumetria',
     @IdExecucao = @IdExecucao,
-    @NomeTabelaDestino = 'dbo.Base360',
+    @NomeTabelaDestino = 'itau.Base360',
     @LinhasOrigem = @LinhasOrigem,
     @LinhasInseridas = @LinhasInseridas,
     @LinhasAtualizadas = @LinhasAtualizadas,

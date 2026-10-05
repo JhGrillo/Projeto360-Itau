@@ -7,7 +7,7 @@ Create or Alter Procedure itau.ProcBaseMailing360 as
     Nome: ProcBaseMailing360
     DataCriação: 12/08/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização: 28/08/2026
+    DataAtualização: 02/10/2026
     Atualizado por: Leonardo Matheus Talarico
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
@@ -15,6 +15,11 @@ Create or Alter Procedure itau.ProcBaseMailing360 as
 	28/08/2026 Leonardo Matheus Talarico: Foi modificado o local onde é contabilizado o carregamento das linhas origens e a forma como é carregado a Base dentro da temporária
 	#Base360, considerando apenas os IDs Bases que ainda não foram adicionados na tabela da BaseMailing360. Foi feito isso para evitar que existissem linhas carregadas de Origem,
 	mas que não houvessem Linhas Inseridas e Atualizadas nas contagens.
+
+	02/10/2026 Leonardo Matheus Talarico: Foi adicionado dentro do codigo um trecho que verificará a média da volumetria das últimas atualizações e
+    também a máxima volumetria dos ultimos 3 meses diariamente. Caso a quantidade de Linhas atualizadas e inseridas na tabela final for maior que
+    as atualizações recentes e também maior que 75% do que a média histórica, é lido somente 10% da tabela de destino e é recalculado a distribuição
+    dos dados ao atualizar as métricas do otimizador de consultas
 
 */
 
@@ -26,6 +31,8 @@ Declare @NomeProcedure varchar(128) = 'ProcBaseMailing360',
         @Etapa varchar(100) = 'Inicio',
 		@UltimaAtualizacao datetime,
         @IdExecucao int,
+		@MediaUltimasExecucoes int,
+        @MediaVolumetria int,
         @LinhasOrigem int,
         @LinhasInseridas int,
         @LinhasAtualizadas int,
@@ -147,7 +154,7 @@ Insert into #MailingFinal (
 							IdDevedor,
 							IdTitulo,
 							IdRetirada
-						)
+						    )
 Select
 	b.IdBase,
 	b.Data,
@@ -210,6 +217,33 @@ Where
 
 Set @LinhasAtualizadas += @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + isnull(@LinhasAtualizadas, 0);
+
+Set @MediaUltimasExecucoes = (Select 
+                                avg (LinhasTotaisDestino)
+                              From (Select top 10
+										LinhasTotaisDestino
+                                    From dbDataDwItau.log.ControleVolumes With(nolock)
+                                    Where   
+                                        NomeTabelaDestino = 'itau.BaseMailing360'
+                                    Order by
+                                        IdControleVolume desc) a);
+
+Set @MediaVolumetria = (Select
+							avg (LinhasTotaisDestino)
+						From (Select
+								Max(LinhasTotaisDestino) as LinhasTotaisDestino
+							  From
+								dbDataDwItau.log.ControleVolumes With(nolock)
+							  Where
+								NomeTabelaDestino = 'itau.BaseMailing360'
+							  Group by
+								Convert(date, DataExecucao)) a);
+
+If @LinhasTotaisDestino > @MediaUltimasExecucoes and @LinhasTotaisDestino >= @MediaVolumetria * 0.75
+Begin
+    Update Statistics dbDataDwItau.itau.BaseMailing360 With Sample 10 Percent;
+End;
+
 Set @DataHoraFim = Getdate();
 
 /* Grava volumetria controles de log */
@@ -217,7 +251,7 @@ Exec dbDataDwItau.log.ProcControles
     @TipoLog = 'Volumetria',
     @IdExecucao = @IdExecucao,
     @NomeTabelaOrigem = 'misitau.dbo.Mailing',
-    @NomeTabelaDestino = 'dbDataDWItau.itau.BaseMailing360',
+    @NomeTabelaDestino = 'itau.BaseMailing360',
     @LinhasOrigem = @LinhasOrigem,
     @LinhasInseridas = @LinhasInseridas,
     @LinhasTotaisDestino = @LinhasTotaisDestino;

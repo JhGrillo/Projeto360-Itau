@@ -1,4 +1,4 @@
-Create or Alter Procedure [dbo].[ProcParcelas] as
+Create or Alter Procedure dbo.ProcParcelas as 
 
 ------------------------------> Descrição da procedure
 
@@ -7,10 +7,16 @@ Create or Alter Procedure [dbo].[ProcParcelas] as
     Nome: ProcParcelas
     DataCriação: 22/07/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização:
-    Atualizado por:
+    DataAtualização: 05/10/2026
+    Atualizado por: Leonardo Matheus Talarico
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+    02/10/2026 Leonardo Matheus Talarico: Foi adicionado dentro do codigo um trecho que verificará a média da volumetria das últimas atualizações e
+    também a máxima volumetria dos ultimos 3 meses diariamente. Caso a quantidade de Linhas atualizadas e inseridas na tabela final for maior que
+    as atualizações recentes e também maior que 75% do que a média histórica, é lido somente 10% da tabela de destino e é recalculado a distribuição
+    dos dados ao atualizar as métricas do otimizador de consultas
+
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -20,6 +26,8 @@ Set nocount on;
 Declare @NomeProcedure varchar(128) = 'ProcParcelas',
     @Etapa varchar(100) = 'Inicio',
     @UltimaAtualizacao datetime,
+    @MediaUltimasExecucoes int,
+    @MediaVolumetria int,
     @Tabela varchar(25),
     @IdExecucao int,
     @LinhasOrigem int,
@@ -50,8 +58,8 @@ Set @Etapa = 'Carga das tabelas temporarias';
 
 Set @UltimaAtualizacao = (Select 
                             Case
-                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,+1,Convert(date,DataHoraInicio)))
-                                else Max(Convert(date,DataHoraInicio))
+                                when Datepart(hour,Max(DataHoraInicio)) >= 22 then Max(Dateadd(day,-2,Convert(date,DataHoraInicio)))
+                                else Max(Convert(date,DataHoraInicio - 1))
                             end
                          From misitau.[log].ControleExecucoes
                          Where
@@ -235,6 +243,33 @@ end;
 
 Set @LinhasAtualizadas = @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + Isnull(@LinhasAtualizadas,0);
+
+Set @MediaUltimasExecucoes = (Select 
+                                avg (LinhasTotaisDestino)
+                              From (Select top 10
+                                        LinhasTotaisDestino
+                                    From misitau.log.ControleVolumes With(nolock)
+                                    Where   
+                                        NomeTabelaDestino = 'dbo.Parcelas'
+                                    Order by
+                                        IdControleVolume desc) a);
+
+Set @MediaVolumetria = (Select
+                            avg (LinhasTotaisDestino)
+                        From (Select
+                                Max(LinhasTotaisDestino) as LinhasTotaisDestino
+                              From
+                                misitau.log.ControleVolumes With(nolock)
+                              Where
+                                NomeTabelaDestino = 'dbo.Parcelas'
+                              Group by
+                                Convert(date, DataExecucao)) a);
+
+If @LinhasTotaisDestino > @MediaUltimasExecucoes and @LinhasTotaisDestino >= @MediaVolumetria * 0.75
+Begin
+    Update Statistics misitau.dbo.Parcelas With Sample 10 Percent;
+End;
+
 Set @DataHoraFim = Dateadd(hour,-3,Getdate());
 
 /* Grava volumetria controles de log */
