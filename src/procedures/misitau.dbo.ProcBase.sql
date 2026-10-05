@@ -7,8 +7,8 @@ Create or Alter Procedure dbo.ProcBase as
     Nome: ProcBase
     DataCriação: 04/08/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização: 18/08/2026
-    Atualizado por: Leonardo Matheus Talarico
+    DataAtualização: 02/10/2026
+    Atualizado por: Leonardo Matheus Talarico 
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
 
@@ -16,7 +16,10 @@ Create or Alter Procedure dbo.ProcBase as
     com regras de negócios, pois a ideia de procedure ProcBase é armazenar dados de clientes ativos, qualquer calculo
     de regra de negócio é feito no processo que usara a dbo.Base como origem.
 
-    18/08/2026 Leonardo Matheus Talarico: Foi adicionado um contador para as Linhas De Origem no momento em que são inseridas as Parcelas
+    02/10/2026 Leonardo Matheus Talarico: Foi adicionado dentro do codigo um trecho que verificará a média da volumetria das últimas atualizações e
+    também a máxima volumetria dos ultimos 3 meses diariamente. Caso a quantidade de Linhas atualizadas e inseridas na tabela final for maior que
+    as atualizações recentes e também maior que 75% do que a média histórica, é lido somente 10% da tabela de destino e é recalculado a distribuição
+    dos dados ao atualizar as métricas do otimizador de consultas
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -26,6 +29,8 @@ Set Nocount On;
 Declare @NomeProcedure varchar(128) = 'ProcBase',
         @Etapa varchar(100) = 'Inicio',
         @IdExecucao int,
+        @MediaUltimasExecucoes int,
+        @MediaVolumetria int,
         @LinhasOrigem int,
         @LinhasInseridas int,
         @LinhasAtualizadas int,
@@ -387,6 +392,33 @@ From #Base a;
 
 Set @LinhasInseridas = @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas;
+
+Set @MediaUltimasExecucoes = (Select 
+                                avg (LinhasTotaisDestino)
+                              From (Select top 10
+                                        LinhasTotaisDestino
+                                    From misitau.log.ControleVolumes With(nolock)
+                                    Where   
+                                        NomeTabelaDestino = 'dbo.Base'
+                                    Order by
+                                        IdControleVolume desc) a);
+
+Set @MediaVolumetria = (Select
+                    avg (LinhasTotaisDestino)
+                    From (Select
+                            Max(LinhasTotaisDestino) as LinhasTotaisDestino
+                          From
+                            misitau.log.ControleVolumes With(nolock)
+                          Where
+                            NomeTabelaDestino = 'dbo.Base'
+                          Group by
+                            Convert(date, DataExecucao)) a);
+
+If @LinhasTotaisDestino > @MediaUltimasExecucoes and @LinhasTotaisDestino >= @MediaVolumetria * 0.75
+Begin
+    Update Statistics misitau.dbo.Base With Sample 10 Percent;
+End;
+
 Set @DataHoraFim = Dateadd(hour,-3,Getdate());
 
 ------------------------------> Atualizacao de dados

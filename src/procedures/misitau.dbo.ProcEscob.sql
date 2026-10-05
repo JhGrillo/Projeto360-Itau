@@ -1,4 +1,4 @@
-Create or Alter procedure dbo.ProcEscob as
+Create or Alter Procedure dbo.ProcEscob as 
 
 ------------------------------> Descrição da procedure
 
@@ -7,10 +7,15 @@ Create or Alter procedure dbo.ProcEscob as
     Nome: ProcEscob
     DataCriação: 30/07/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização:
-    Atualizado por:
+    DataAtualização: 02/10/2026
+    Atualizado por: Leonardo Matheus Talarico
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+    02/10/2026 Leonardo Matheus Talarico: Foi adicionado dentro do codigo um trecho que verificará a média da volumetria das últimas atualizações e
+    também a máxima volumetria dos ultimos 3 meses diariamente. Caso a quantidade de Linhas atualizadas e inseridas na tabela final for maior que
+    as atualizações recentes e também maior que 75% do que a média histórica, é lido somente 10% da tabela de destino e é recalculado a distribuição
+    dos dados ao atualizar as métricas do otimizador de consultas
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -21,6 +26,8 @@ Declare @NomeProcedure varchar(128) = 'ProcEscob',
     @Etapa varchar(100) = 'Inicio',
     @IdEscob int,
     @UltimaAtualizacao datetime,
+    @MediaUltimasExecucoes int,
+    @MediaVolumetria int,
     @IdExecucao int,
     @LinhasOrigem int,
     @LinhasInseridas int,
@@ -150,6 +157,33 @@ Where
 
 Set @LinhasAtualizadas = @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + @LinhasAtualizadas;
+
+Set @MediaUltimasExecucoes = (Select 
+                                avg (LinhasTotaisDestino)
+                              From (Select top 10
+                                        LinhasTotaisDestino
+                                    From misitau.log.ControleVolumes With(nolock)
+                                    Where   
+                                        NomeTabelaDestino = 'dbo.Escob'
+                                    Order by
+                                        IdControleVolume desc) a);
+
+Set @MediaVolumetria = (Select
+                            avg (LinhasTotaisDestino)
+                        From (Select
+                                Max(LinhasTotaisDestino) as LinhasTotaisDestino
+                              From
+                                misitau.log.ControleVolumes With(nolock)
+                              Where
+                                NomeTabelaDestino = 'dbo.Escob'
+                              Group by
+                                Convert(date, DataExecucao)) a);
+
+If @LinhasTotaisDestino > @MediaUltimasExecucoes and @LinhasTotaisDestino >= @MediaVolumetria * 0.75
+Begin
+    Update Statistics misitau.dbo.Escob With Sample 10 Percent;
+End;
+
 Set @DataHoraFim = Dateadd(hour,-3,Getdate());
 
 /* Grava volumetria controles de log */

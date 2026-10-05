@@ -1,4 +1,4 @@
-Create or Alter Procedure dbo.ProcTitulos as
+Create or Alter Procedure dbo.ProcTitulos as 
 
 ------------------------------> Descrição da procedure
 
@@ -7,10 +7,16 @@ Create or Alter Procedure dbo.ProcTitulos as
     Nome: ProcTitulos
     DataCriação: 23/07/2026
     Criado por: Leonardo Matheus Talarico
-    DataAtualização:
-    Atualizado por:
+    DataAtualização: 05/10/2026
+    Atualizado por: Leonardo Matheus Talarico
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
+
+    02/10/2026 Leonardo Matheus Talarico: Foi adicionado dentro do codigo um trecho que verificará a média da volumetria das últimas atualizações e
+    também a máxima volumetria dos ultimos 3 meses diariamente. Caso a quantidade de Linhas atualizadas e inseridas na tabela final for maior que
+    as atualizações recentes e também maior que 75% do que a média histórica, é lido somente 10% da tabela de destino e é recalculado a distribuição
+    dos dados ao atualizar as métricas do otimizador de consultas
+
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -22,6 +28,8 @@ Declare @NomeProcedure varchar(128) = 'ProcTitulos',
     @IdTitulo int,
     @UltimaAtualizacao datetime,
     @IdExecucao int,
+    @MediaUltimasExecucoes int,
+    @MediaVolumetria int,
     @LinhasOrigem int,
     @LinhasInseridas int,
     @LinhasAtualizadas int,
@@ -215,6 +223,32 @@ Where
 
 Set @LinhasAtualizadas = @@RowCount;
 Set @LinhasTotaisDestino = @LinhasInseridas + @LinhasAtualizadas;
+
+Set @MediaUltimasExecucoes = (Select 
+                                avg (LinhasTotaisDestino)
+                              From (Select top 10 
+                                        LinhasTotaisDestino
+                                    From misitau.log.ControleVolumes With(nolock)
+                                    Where   
+                                        NomeTabelaDestino = 'dbo.Titulos'
+                                    Order by
+                                        IdControleVolume desc) a);
+
+Set @MediaVolumetria = (Select
+                            avg (LinhasTotaisDestino)
+                        From (Select 
+                                Max(LinhasTotaisDestino) as LinhasTotaisDestino
+                              From misitau.log.ControleVolumes With(nolock)
+                              Where
+                                NomeTabelaDestino = 'dbo.Titulos'
+                              Group by
+                                Convert(date, DataExecucao)) a);
+
+If @LinhasTotaisDestino > @MediaUltimasExecucoes and @LinhasTotaisDestino >= @MediaVolumetria * 0.75
+Begin
+    Update Statistics misitau.dbo.Titulos With Sample 10 Percent;
+End;
+
 Set @DataHoraFim = Dateadd(hour,-3,Getdate());
 
 /* Grava volumetria controles de log */
