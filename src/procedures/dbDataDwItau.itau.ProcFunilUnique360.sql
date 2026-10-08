@@ -1,5 +1,4 @@
-
-Create or Alter Procedure itau.ProcFunilUnique360 as 
+Create or Alter procedure itau.ProcFunilUnique360 as
 
 ------------------------------> Descrição da procedure
 
@@ -8,18 +7,19 @@ Create or Alter Procedure itau.ProcFunilUnique360 as
     Nome: ProcFunilUnique360
     DataCriação: 27/08/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização: 06/10/2026
-    Atualizado por: Leonardo Matheus Talarico
+    DataAtualização: 08/10/2026
+    Atualizado por: João Henrique Cavalheiro Grillo
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
 
 	06/10/2026 Leonardo Matheus Talarico: Ao inserir as informações na tabela final do FunilUnique360 os primeiros dias uteis não eram inseridos devido a um erro de lógica, que desconsiderava
 	qualquer data menor ou igual ao dia 01 e com 00:00 horas. Ou seja, o primeiro loop nunca era marcado, pois as datas observadas eram sempre maiores que o seu horário.
 
+	08/10/2026 João Henrique Cavalheiro Grillo:
+	- Campos adicionados, valores de base (Regularizacao e SaldoVencido), valores de acordos, vencimentos e pagamentos (Valor e Regularização).
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
-
 
 Set Nocount On;
 
@@ -61,6 +61,8 @@ Create table #AnaliticoUnique (
 	FaixaAtraso varchar(32),
 	FaixaValor varchar(32),
 	Base datetime,
+	ValorRegularizacao money,
+	ValorSaldoVencido money,
 	Mailing datetime,
 	TrabalhadoDiscador datetime,
 	TrabalhadoDiscadorDigital datetime,
@@ -68,8 +70,14 @@ Create table #AnaliticoUnique (
 	Atendido datetime,
 	CPC datetime,
 	Acordo datetime,
+	ValorAcordo money,
+	ValorAcordoRegularizacao money,
 	Vencimento datetime,
-	Pagamento datetime
+	ValorVencimento money,
+	ValorVencimentoRegularizacao money,
+	Pagamento datetime,
+	ValorPagamento money,
+	ValorPagamentoRegularizacao money
 );
 
 ------------------------------> Carga das tabelas temporarias
@@ -101,7 +109,9 @@ With BaseUnique as (
 		Cluster,
 		Max(FaixaAtraso) as FaixaAtraso,	
 		Max(FaixaValor) as FaixaValor,
-		Min(Data) as Base
+		Min(Data) as Base,
+		Max(ValorRegularizacao) as ValorRegularizacao,
+		Max(SaldoVencido) as SaldoVencido
 	From dbDataDwItau.itau.Base360 a With(nolock)
 	Where
 		Data between @DataIni and @DataFim
@@ -211,8 +221,7 @@ CRMUnique as (
 		Max(b.FaixaValor) as FaixaValor,
 		Min(a.Data) as TrabalhadoCRM,
 		Min(Case when a.Atendimento = 1 then a.Data end) as Atendido,
-		Min(Case when a.CPC = 1 then a.Data end) as CPC,
-		Min(Case when a.Acordo = 1 then a.Data end) as AcordoCRM
+		Min(Case when a.CPC = 1 then a.Data end) as CPC
 	From dbDataDwItau.itau.CRM360 a With(nolock)
 	Inner join dbDataDwItau.itau.Base360 b With(nolock) on a.IdBase = b.IdBase
 	Where
@@ -239,12 +248,15 @@ AcordoUnique as (
 		b.Cluster,
 		Max(b.FaixaAtraso) as FaixaAtraso,	
 		Max(b.FaixaValor) as FaixaValor,
-		Min(a.Data) as Acordo
+		Min(a.Data) as Acordo,
+		Sum(a.Valor) as ValorAcordo,
+		Max(b.ValorRegularizacao) as ValorAcordoRegularizacao
 	From dbDataDwItau.itau.Acordos360 a With(nolock)
 	Inner join dbDataDwItau.itau.Base360 b With(nolock) on a.IdBase = b.IdBase
 	Where
 		a.Data between @DataIni and @DataFim
-		and CodigoReferencia = 777
+		and b.CodigoReferencia = 777
+		and a.NumeroParcela = 1
 	Group by
 		b.IdDevedor,
 		b.CodigoReferencia,
@@ -266,12 +278,15 @@ VencimentoUnique as (
 		b.Cluster,
 		Max(b.FaixaAtraso) as FaixaAtraso,	
 		Max(b.FaixaValor) as FaixaValor,
-		Min(a.Data) as Vencimento
+		Min(a.Data) as Vencimento,
+		Sum(a.Valor) as ValorVencimento,
+		Max(b.ValorRegularizacao) as ValorVencimentoRegularizacao
 	From dbDataDwItau.itau.Vencimentos360 a With(nolock)
 	Inner join dbDataDwItau.itau.Base360 b With(nolock) on a.IdBase = b.IdBase
 	Where
 		a.Data between @DataIni and @DataFim
-		and CodigoReferencia = 777
+		and b.CodigoReferencia = 777
+		and a.NumeroParcela = 1
 	Group by
 		b.IdDevedor,
 		b.CodigoReferencia,
@@ -293,12 +308,15 @@ PagamentoUnique as (
 		b.Cluster,
 		Max(b.FaixaAtraso) as FaixaAtraso,	
 		Max(b.FaixaValor) as FaixaValor,
-		Min(a.Data) as Pagamento
+		Min(a.Data) as Pagamento,
+		Sum(a.ValorPago) as ValorPagamento,
+		Max(b.ValorRegularizacao) as ValorPagamentoRegularizacao
 	From dbDataDwItau.itau.Pagamentos360 a With(nolock)
 	Inner join dbDataDwItau.itau.Base360 b With(nolock) on a.IdBase = b.IdBase
 	Where
 		a.Data between @DataIni and @DataFim
-		and CodigoReferencia = 777
+		and b.CodigoReferencia = 777
+		and a.NumeroParcela = 1
 	Group by
 		b.IdDevedor,
 		b.CodigoReferencia,
@@ -320,15 +338,23 @@ Select
 	a.FaixaAtraso,
 	a.FaixaValor,
 	Convert(date,a.Base) as Base,
+	a.ValorRegularizacao,
+	a.SaldoVencido,
 	Convert(date,b.Mailing) as Mailing,
 	Convert(date,c.TrabalhadoDiscador) as TrabalhadoDiscador,
 	Convert(date,d.TrabalhadoDiscadorDigital) as TrabalhadoDiscadorDigital,
 	Convert(date,e.TrabalhadoCRM) as TrabalhadoCRM,
 	Convert(date,e.Atendido) as Atendido,
 	Convert(date,e.CPC) as CPC,
-	Convert(date,Isnull(f.Acordo,e.AcordoCRM)) as Acordo,
-	Convert(date,Isnull(h.Pagamento,g.Vencimento)) as Vencimento,
-	Convert(date,h.Pagamento) as Pagamento
+	Convert(date,f.Acordo) as Acordo,
+	f.ValorAcordo as ValorAcordo,
+	f.ValorAcordoRegularizacao as ValorAcordoRegularizacao,
+	Convert(date,Isnull(g.Vencimento,h.Pagamento)) as Vencimento,
+	Isnull(g.ValorVencimento,h.ValorPagamento) as ValorVencimento,
+	Isnull(g.ValorVencimentoRegularizacao,h.ValorPagamentoRegularizacao) as ValorVencimentoRegularizacao,
+	Convert(date,h.Pagamento) as Pagamento,
+	h.ValorPagamento as ValorPagamento,
+	h.ValorPagamentoRegularizacao as ValorPagamentoRegularizacao
 From BaseUnique a
 Left join MailingUnique b on a.IdDevedor = b.IdDevedor
 							  and a.CodigoReferencia = b.CodigoReferencia
@@ -404,7 +430,35 @@ Begin
 	
 	Set @DiaUtil = (Select DiaUtil From [srv-dbbi].dw.geral.Calendario With(nolock) Where Data = @DataIniLoop);
 
-	Insert into itau.FunilUnique360
+	Insert into itau.FunilUnique360 (
+										Ano,
+										Mes,
+										Data,
+										DiaUtil,
+										CodigoReferencia,
+										Carteira,
+										Produto,
+										SubProduto,
+										Cluster,
+										FaixaAtraso,
+										FaixaValor,
+										Base,
+										ValorRegularizacao,
+										ValorSaldoVencido,
+										Mailing,
+										Trabalhado,
+										Atendido,
+										CPC,
+										Acordo,
+										ValorAcordo,
+										ValorAcordoRegularizacao,
+										Vencimento,
+										ValorVencimento,
+										ValorVencimentoRegularizacao,
+										Pagamento,
+										ValorPagamento,
+										ValorPagamentoRegularizacao
+									)
 	Select
 		Year(@DataIniLoop) as Ano,
 		Month(@DataIniLoop) as Mes,
@@ -418,13 +472,21 @@ Begin
 		FaixaAtraso,
 		FaixaValor,
 		Count(Case when Base <= @DataIniLoop then IdDevedor end) as Base,
+		Sum(Case when Base <= @DataIniLoop then ValorRegularizacao end) as ValorRegularizacao,
+		Sum(Case when Base <= @DataIniLoop then ValorSaldoVencido end) as ValorSaldoVencido,
 		Count(Case when Mailing <= @DataIniLoop or TrabalhadoDiscador <= @DataIniLoop or TrabalhadoDiscadorDigital <= @DataIniLoop or TrabalhadoCRM <= @DataIniLoop then IdDevedor end) as Mailing,
 		Count(Case when TrabalhadoDiscador <= @DataIniLoop or TrabalhadoDiscadorDigital <= @DataIniLoop or TrabalhadoCRM <= @DataIniLoop then IdDevedor end) as Trabalhado,
 		Count(Case when Atendido <= @DataIniLoop then IdDevedor end) as Atendido,
 		Count(Case when CPC <= @DataIniLoop then IdDevedor end) as CPC,
 		Count(Case when Acordo <= @DataIniLoop then IdDevedor end) as Acordo,
+		Sum(Case when Acordo <= @DataIniLoop then ValorAcordo end) as ValorAcordo,
+		Sum(Case when Acordo <= @DataIniLoop then ValorAcordoRegularizacao end) as ValorAcordoRegularizacao,
 		Count(Case when Vencimento <= @DataIniLoop then IdDevedor end) as Vencimento,
-		Count(Case when Pagamento <= @DataIniLoop then IdDevedor end) as Pagamento
+		Count(Case when Vencimento <= @DataIniLoop then ValorVencimento end) as ValorVencimento,
+		Count(Case when Vencimento <= @DataIniLoop then ValorVencimentoRegularizacao end) as ValorVencimentoRegularizacao,
+		Count(Case when Pagamento <= @DataIniLoop then IdDevedor end) as Pagamento,
+		Count(Case when Pagamento <= @DataIniLoop then ValorPagamento end) as ValorPagamento,
+		Count(Case when Pagamento <= @DataIniLoop then ValorPagamentoRegularizacao end) as ValorPagamentoRegularizacao
 	From #AnaliticoUnique
 	Group by
 		CodigoReferencia,
@@ -478,4 +540,4 @@ Exec dbDataDwItau.[log].ProcControles
     @LinhaErro = @LinhaErro,
     @EtapaErro = @Etapa;
 
-end catch
+end catch;
