@@ -1,4 +1,4 @@
-Create or Alter Procedure dbo.ProcTitulosInformacoesComplementares as 
+Create or Alter Procedure [dbo].[ProcTitulosInformacoesComplementares] as 
 
 ------------------------------> Descrição da procedure
 
@@ -7,8 +7,8 @@ Create or Alter Procedure dbo.ProcTitulosInformacoesComplementares as
 	Nome: ProcTitulosInformacoesComplementares
 	DataCriação: 23/07/2026
 	Criado por: Leonardo Matheus Talarico
-	DataAtualização: 05/10/2026
-	Atualizado por: Leonardo Matheus Talarico
+	DataAtualização: 20/10/2026
+	Atualizado por: João Henrique Cavalheiro Grillo
 
 	Descrição atualização: (Data, Atualizado por, Descrição, git)
 
@@ -22,6 +22,7 @@ Create or Alter Procedure dbo.ProcTitulosInformacoesComplementares as
     as atualizações recentes e também maior que 75% do que a média histórica, é lido somente 10% da tabela de destino e é recalculado a distribuição
     dos dados ao atualizar as métricas do otimizador de consultas
 
+	20/10/2026 João Henrique Cavalheiro Grillo: Foi incluido a coluna NomeProduto.
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -78,7 +79,8 @@ Create table #DadosOrigem (
 	ValidoDe datetime2,
 	ValidoAte datetime2,
 	AreaNegocio varchar(2),
-	CodigoClusterScore varchar(4)
+	CodigoClusterScore varchar(4),
+	NomeProduto varchar(100)
 );
 
 --- | Titulos informações complementares
@@ -99,7 +101,8 @@ Create table #TitulosInformacoesComplementares (
 	ValidoDe datetime2,
 	ValidoAte datetime2,
 	AreaNegocio varchar(2),
-	CodigoClusterScore varchar(4)
+	CodigoClusterScore varchar(4),
+	NomeProduto varchar(100)
 );
 
 ------------------------------> Carga das tabelas temporarias
@@ -134,7 +137,8 @@ Insert into #DadosOrigem (
 						ValidoDe,
 						ValidoAte,
 						AreaNegocio,
-						CodigoClusterScore
+						CodigoClusterScore,
+						NomeProduto
 						)
 Select
 	IdTituloInformacaoComplementar,
@@ -151,7 +155,8 @@ Select
 	ValidoDe,
 	ValidoAte,
 	AreaNegocio,
-	CodigoClusterScore
+	CodigoClusterScore,
+	NomeProduto
 From misitau.cli.TitulosInformacoesComplementares a
 Where
 	IdTituloInformacaoComplementar > Isnull(@IdTituloInformacaoComplementar,0)
@@ -179,7 +184,8 @@ Insert into #TitulosInformacoesComplementares (
 												ValidoDe,
 												ValidoAte,
 												AreaNegocio,
-												CodigoClusterScore
+												CodigoClusterScore,
+												NomeProduto
 											)
 Select
 	IdTituloInformacaoComplementar,
@@ -196,7 +202,8 @@ Select
 	ValidoDe,
 	ValidoAte,
 	AreaNegocio,
-	CodigoClusterScore
+	CodigoClusterScore,
+	NomeProduto
 From #DadosOrigem a
 Where
 	Not exists (Select 1
@@ -235,7 +242,8 @@ Insert into misitau.dbo.TitulosInformacoesComplementares (
 															ValidoDe,
 															ValidoAte,
 															AreaNegocio,
-															CodigoClusterScore
+															CodigoClusterScore,
+															NomeProduto
                                                           )
 Select distinct
 	IdTituloInformacaoComplementar,
@@ -252,7 +260,8 @@ Select distinct
 	ValidoDe,
 	ValidoAte,
 	AreaNegocio,
-	CodigoClusterScore
+	CodigoClusterScore,
+	NomeProduto
 From #TitulosInformacoesComplementares a With(nolock)
 Where
 	Not exists (Select 1
