@@ -49,7 +49,7 @@ Begin Try
 
 Set @Etapa = 'Limpeza de tabela';
 
---- | Limpeza da tabela pelo periodo de analitico disponivel
+--- | Limpeza da tabela do inicio do mês até a data de hoje
 
 Set @DataIni = Dateadd(month, Datediff(month, 0, Getdate()),0);
 Set @DataFim = Dateadd(day, Datediff(day, 0, Getdate()),0) + '23:59';
@@ -259,8 +259,8 @@ MetaPagamentosCTE as (
 		a.DataPagamento as Data,
 		b.CodigoReferencia,
 		b.Carteira, 
-		b.SubProduto,
-		b.Cluster,
+		c.SubProduto,
+		Case when c.Equipe like 'WO%' then 'WO' else b.Cluster End as Cluster,
 		c.Referencia,
 		c.Nome,
 		c.Coordenador,
@@ -276,7 +276,8 @@ MetaPagamentosCTE as (
 		a.DataPagamento,
 		b.CodigoReferencia,
 		b.Carteira, 
-		b.SubProduto,
+		c.SubProduto,
+		c.Equipe,
 		b.Cluster,
 		c.Referencia,
 		c.Nome,
