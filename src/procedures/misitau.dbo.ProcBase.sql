@@ -1,4 +1,4 @@
-Create or Alter Procedure dbo.ProcBase as 
+Create or Alter Procedure [dbo].[ProcBase] as 
 
 ------------------------------> Descrição da procedure
 
@@ -7,8 +7,8 @@ Create or Alter Procedure dbo.ProcBase as
     Nome: ProcBase
     DataCriação: 04/08/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização: 02/10/2026
-    Atualizado por: Leonardo Matheus Talarico 
+    DataAtualização: 20/10/2026
+    Atualizado por: João Henrique Cavalheiro Grillo
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
 
@@ -20,6 +20,8 @@ Create or Alter Procedure dbo.ProcBase as
     também a máxima volumetria dos ultimos 3 meses diariamente. Caso a quantidade de Linhas atualizadas e inseridas na tabela final for maior que
     as atualizações recentes e também maior que 75% do que a média histórica, é lido somente 10% da tabela de destino e é recalculado a distribuição
     dos dados ao atualizar as métricas do otimizador de consultas
+
+	20/10/2026 João Henrique Cavalheiro Grillo: Incluido coluna NomeProduto.
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -81,7 +83,8 @@ Create table #Titulos (
     Plano smallint,
     ValorContratoAtualizado money,
     AreaNegocio varchar(2),
-    CodigoClusterScore varchar(4)
+    CodigoClusterScore varchar(4),
+	NomeProduto varchar(100)
 );
 
 --- | Devedores titulos
@@ -153,7 +156,8 @@ Create table #Base (
     Risco money,
     SaldoVencido money,
     ValorRegularizacao money,
-    AreaNegocio varchar(2)
+    AreaNegocio varchar(2),
+	NomeProduto varchar(100)
 );
 
 ------------------------------> Carga das tabelas temporarias
@@ -201,7 +205,8 @@ Insert into #Titulos (
                      Plano,
                      ValorContratoAtualizado,
                      AreaNegocio,
-                     CodigoClusterScore
+                     CodigoClusterScore,
+					 NomeProduto
                     )
 Select
 	a.IdTitulo,
@@ -212,7 +217,8 @@ Select
 	a.Plano,
 	b.ValorContratoAtualizado,
     b.AreaNegocio,
-    b.CodigoClusterScore
+    b.CodigoClusterScore,
+	b.NomeProduto
 From misitau.dbo.Titulos a With(nolock)
 Left join misitau.dbo.TitulosInformacoesComplementares b With(nolock) on a.IdTitulo = b.IdTitulo
 Inner join #Parcelas c on a.IdTitulo = c.IdTitulo;
@@ -307,7 +313,8 @@ Insert into #Base (
                 Risco,
                 SaldoVencido,
                 ValorRegularizacao,
-                AreaNegocio
+                AreaNegocio,
+				NomeProduto
                 )
 Select
     d.CodigoReferencia,
@@ -335,7 +342,8 @@ Select
     a.Risco,
     a.SaldoVencido,
     b.ValorContratoAtualizado as ValorRegularizacao,
-    b.AreaNegocio
+    b.AreaNegocio,
+	b.NomeProduto
 From #Parcelas a
 Inner join #Titulos b on a.IdTitulo = b.IdTitulo
 Inner join #Devedores c on b.IdDevedor = c.IdDevedor
@@ -368,7 +376,8 @@ Insert into misitau.dbo.Base (
                             Risco,
                             SaldoVencido,
                             ValorRegularizacao,
-                            AreaNegocio
+                            AreaNegocio,
+							NomeProduto
                             )
 Select
     CodigoReferencia,
@@ -387,7 +396,8 @@ Select
     Risco,
     SaldoVencido,
     ValorRegularizacao,
-    AreaNegocio
+    AreaNegocio,
+	NomeProduto
 From #Base a;
 
 Set @LinhasInseridas = @@RowCount;

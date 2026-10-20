@@ -1,5 +1,4 @@
-
-Create or Alter Procedure itau.ProcBase360 as 
+Create or Alter procedure dbo.Base360 as
 
 ------------------------------> Descrição da procedure
 
@@ -8,8 +7,8 @@ Create or Alter Procedure itau.ProcBase360 as
     Nome: ProcBase360
     DataCriação: 06/08/2026
     Criado por: Leonardo Matheus Talarico
-    DataAtualização: 02/10/2026
-    Atualizado por: Leonardo Matheus Talarico
+    DataAtualização: 20/10/2026
+    Atualizado por: João Henrique Cavalheiro Grillo
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
 
@@ -27,6 +26,8 @@ Create or Alter Procedure itau.ProcBase360 as
     também a máxima volumetria dos ultimos 3 meses diariamente. Caso a quantidade de Linhas atualizadas e inseridas na tabela final for maior que
     as atualizações recentes e também maior que 75% do que a média histórica, é lido somente 10% da tabela de destino e é recalculado a distribuição
     dos dados ao atualizar as métricas do otimizador de consultas
+
+	20/10/2026 João Henrique Cavalheiro Grillo: Criado o campo de CategoriaContrato se baseando no campo NomeProduto de TitulosInformaçõesComplementares;
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
@@ -86,7 +87,8 @@ Create table #DadosOrigem (
 	Risco money,
 	SaldoVencido money,
 	ValorRegularizacao money,
-	FaixaValor varchar(32)
+	FaixaValor varchar(32),
+	Categoria varchar(100)
 );
 
 --- | Base360
@@ -113,7 +115,8 @@ Create table #Base360 (
 	Risco money,
 	SaldoVencido money,
 	ValorRegularizacao money,
-	FaixaValor varchar(32)
+	FaixaValor varchar(32),
+	Categoria varchar(100)
 );
 
 ------------------------------> Carga de tabelas temporarias
@@ -143,7 +146,8 @@ Insert into #DadosOrigem (
 					Risco,
 					SaldoVencido,
 					ValorRegularizacao,
-					FaixaValor
+					FaixaValor,
+					Categoria
 				   )
 Select
 	Convert(date,Getdate()) as Data,
@@ -166,7 +170,8 @@ Select
 	Risco,
 	SaldoVencido,
 	ValorRegularizacao,
-	FaixaValor
+	FaixaValor,
+	NomeProduto
 From misitau.misitau.dbo.Base a With(nolock)
 Cross Apply (Select
 				Case
@@ -244,7 +249,8 @@ Insert into #Base360 (
 					Risco,
 					SaldoVencido,
 					ValorRegularizacao,
-					FaixaValor
+					FaixaValor,
+					Categoria
 				   )
 Select
 	Data,
@@ -267,7 +273,8 @@ Select
 	Risco,
 	SaldoVencido,
 	ValorRegularizacao,
-	FaixaValor
+	FaixaValor,
+	Categoria
 From #DadosOrigem a With(nolock)
 Where
 	Not exists (Select 1
@@ -316,7 +323,8 @@ Insert into dbDataDwItau.itau.Base360 (
 									   DataVencimento,
 									   Risco,
 									   SaldoVencido,
-									   ValorRegularizacao
+									   ValorRegularizacao,
+									   Categoria
 									   )
 Select
 	Data,
@@ -336,7 +344,8 @@ Select
 	DataVencimento,
 	Risco,
 	SaldoVencido,
-	ValorRegularizacao
+	ValorRegularizacao,
+	Categoria
 From #Base360 a With(nolock)
 Where
 	Not exists (Select 1
@@ -362,7 +371,8 @@ Set a.Plano = b.Plano,
 	a.Risco = b.Risco,
 	a.SaldoVencido = b.SaldoVencido,
 	a.ValorRegularizacao = b.ValorRegularizacao,
-	a.FaixaValor = b.FaixaValor
+	a.FaixaValor = b.FaixaValor,
+	a.Categoria = b.Categoria
 From dbDataDwItau.itau.Base360 a With(nolock)
 inner join #Base360 b on a.IdDevedor = b.IdDevedor
 					     and a.IdTitulo = b.IdTitulo
