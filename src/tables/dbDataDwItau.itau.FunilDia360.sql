@@ -1,0 +1,28 @@
+Create table dbDataDwItau.itau.FunilDia360 (
+    Data datetime,
+    CodigoReferencia smallint,
+    Carteira varchar(64),
+    Produto varchar(64),
+    SubProduto varchar(64),
+    Cluster varchar(4),
+    Mailing int,
+    FaixaAtraso varchar(32),
+    FaixaValor varchar(32),
+    Base int,
+    ValorRegularizacao money    
+    DiscagensDiscador int,
+    DiscagensDigital int,
+    Trabalhado int,
+    Atendido int,
+    CPC int,
+    Acordo int,
+    ValorAcordo money,
+    Vencimento int,
+    ValorVencimento money,
+    Pagamento int,
+    ValorPagamento money,
+    ValorAcordoRegularizacao money,
+    ValorVencimentoRegularizacao money,
+    ValorPagamentoRegularizacao money,
+    ValorSaldoVencido money
+)
