@@ -11,12 +11,11 @@ Create or Alter Procedure itau.ProcQuartilDia360 as
     Atualizado por: 
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
-
 */
 
 ------------------------------> Definições de variaveis e controles de ambiente
 
-set Nocount on;
+--set Nocount on;
 
 Declare @NomeProcedure varchar(128) = 'ProcQuartilDia360',
         @Etapa varchar(100) = 'Inicio',
@@ -86,7 +85,8 @@ Create Table #QuartilDia360 (
 	ValorCaixaProjetado money,
 	ValorRegularizacaoProjetado money,
 	IcmProjetadoCaixa float,
-	IcmProjetadoRegularizacao float
+	IcmProjetadoRegularizacao float,
+	Quartil int
 );
 
 ------------------------------> Carga de tabelas temporarias
@@ -299,6 +299,8 @@ DiasUteisMes as (
 /* Calculo de Icm */
 IcmCTE as (
 	Select 
+		Year(a.Data) as Ano,
+		Month(a.Data) as Mes,
 		a.Data,
 		CodigoReferencia,
 		Carteira,
@@ -321,7 +323,7 @@ IcmCTE as (
 	inner join DiasUteisMes c on Month(a.Data) = c.Mes
 )
 
---- | Quartil Dia 360
+-- | Quartil Dia 360
 Insert into #QuartilDia360 (
 							Data,
 							CodigoReferencia,
@@ -342,7 +344,8 @@ Insert into #QuartilDia360 (
 							ValorCaixaProjetado,
 							ValorRegularizacaoProjetado,
 							IcmProjetadoCaixa,
-							IcmProjetadoRegularizacao
+							IcmProjetadoRegularizacao,
+							Quartil
 							)
 Select Distinct
 	Data,
@@ -364,8 +367,12 @@ Select Distinct
 	((ValorCaixa / DiaUtil) *  DiasUteisMes) as ValorCaixaProjetado,
 	Case When Cluster = 'WO' then cast(null as money) else ((ValorRegularizacao / DiaUtil) * DiasUteisMes) end as ValorRegularizacaoProjetado,
 	((ValorCaixa / DiaUtil) * DiasUteisMes) / MetaCaixa as IcmProjetadoCaixa,
-	((ValorRegularizacao / DiaUtil) * DiasUteisMes) / MetaRegularizacao as IcmProjetadoRegularizacao
-From IcmCTE
+	((ValorRegularizacao / DiaUtil) * DiasUteisMes) / MetaRegularizacao as IcmProjetadoRegularizacao,
+	Case 
+		When Cluster = 'WO' then ntile(4) OVER (PARTITION BY Ano, Mes, Data, DiaUtil, CodigoReferencia, Carteira, SubProduto, Cluster ORDER BY ICMCaixa DESC)
+		Else ntile(4) OVER (PARTITION BY Ano, Mes, Data, DiaUtil, CodigoReferencia, Carteira, SubProduto, Cluster ORDER BY ((ICMCaixa + IcmRegularizacao) / 2) DESC) 
+	End as Quartil
+From IcmCTE		
 Where
 	Nome is not null;
 
@@ -397,7 +404,8 @@ Insert into dbDataDwItau.itau.QuartilDia360 (
 											 ValorCaixaProjetado,
 											 ValorRegularizacaoProjetado,
 											 IcmProjetadoCaixa,
-											 IcmProjetadoRegularizacao
+											 IcmProjetadoRegularizacao,
+											 Quartil
 											 )
 Select
 	Data,
@@ -419,7 +427,8 @@ Select
 	ValorCaixaProjetado,
 	ValorRegularizacaoProjetado,
 	IcmProjetadoCaixa,
-	IcmProjetadoRegularizacao
+	IcmProjetadoRegularizacao,
+	Quartil
 From
 	#QuartilDia360;
 
