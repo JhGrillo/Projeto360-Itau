@@ -1,4 +1,4 @@
-Create or Alter Procedure itau.ProcDiscador360 as
+Create or Alter procedure itau.ProcDiscador360 as
 
 ----------------------------> Descrição da procedure
 
@@ -7,15 +7,17 @@ Create or Alter Procedure itau.ProcDiscador360 as
     Nome: ProcDiscador360
     DataCriação: 07/08/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização: 31/08/2026
-    Atualizado por: Leonardo Matheus Talarico
+    DataAtualização: 23/10/2026
+    Atualizado por: João Henrique Cavalheiro Grillo
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
 
 	31/08/2026 Leonardo Matheus Talarico: Foi modificado a forma como é contabilizado as linhas Origens
-	quando carregada na tabela temporária #DiscadorFinal. Para evitar que as LinhasOrigens fosse sempre carregadas de forma absoluta
+	quando carregada na tabela temporária #DiscadorFinal360. Para evitar que as LinhasOrigens fosse sempre carregadas de forma absoluta
 	foi colocado um filtro onde deixamos de inserir na temporária linhas que já foram inseridas
 	na tabela de destino.
+
+	23/10/2026 João Henrique Cavalheiro Grillo: Adicinado colunas de indicadores (Atendimento, CPC, Acordo).
 	
 */
 
@@ -105,14 +107,35 @@ Create table #DiscadorFinal (
 	DuracaoChamada float,
 	DuracaoFalado float,
 	DuracaoTabulando float,
-	Chave varchar(256)
+	Chave varchar(256),
+	Atendimento int,
+	CPC int,
+	Acordo int
+);
+
+--- | Tipos ocorrências
+
+If Object_id('Tempdb..#TiposOcorrencias') Is not null Drop table #TiposOcorrencias;
+Create table #TiposOcorrencias (
+	TipoOcorrencia varchar(64),
+	Atendimento int,
+	CPC int,
+	Acordo int
 );
 
 ------------------------------> Insere dados em tabelas
 
 --- | Base
 
-Insert into #Base
+Insert into #Base (
+					IdBase,
+					Data,
+					CodigoReferencia,
+					IdDevedor,
+					CnpjCpf,
+					IdTitulo,
+					NumeroContrato
+				)
 Select
 	IdBase,
 	Data,
@@ -222,6 +245,36 @@ Where
 
 Set @LinhasOrigem = @@RowCount;
 
+--- | Tipos Ocorrências
+
+Insert into #TiposOcorrencias
+Select
+	TipoOcorrencia,
+	1 as Atendimento,
+	Case when IdClassificacao = 1 then 1 end as CPC,
+	Case when CodigoOcorrencia in (123,155,774,1056,1057,817) then 1 end as Acordo
+From misitau.misitau.dbo.TiposOcorrencias With(nolock)
+
+union
+
+Select
+	TipoEvento,
+	1 as Atendimento,
+	Case when IdClassificacao = 1 then 1 end as CPC,
+	null as Acordo
+From misitau.misitau.dbo.TiposEventos With(nolock);
+
+------------------------------> Tratativas
+
+--- | Marcação de tabulações
+
+Update a
+Set a.Atendimento = b.Atendimento,
+	a.CPC = b.CPC,
+	a.Acordo = b.Acordo
+From #DiscadorFinal a
+Inner join #TiposOcorrencias b on a.MotivoFinalizacao = b.TipoOcorrencia;
+
 ------------------------------> Persistencia final
 
 Set @Etapa = 'Persistencia final';
@@ -244,7 +297,10 @@ Insert into dbDataDwItau.itau.Discador360 (
 										DuracaoChamada,
 										DuracaoFalado,
 										DuracaoTabulando,
-										Chave
+										Chave,
+										Atendimento,
+										CPC,
+										Acordo
 										)
 Select
 	IdBase,
@@ -262,7 +318,10 @@ Select
 	DuracaoChamada,
 	DuracaoFalado,
 	DuracaoTabulando,
-	Chave
+	Chave,
+	Atendimento,
+	Acordo,
+	CPC
 From #DiscadorFinal a
 Where
 	Not exists (Select 1
