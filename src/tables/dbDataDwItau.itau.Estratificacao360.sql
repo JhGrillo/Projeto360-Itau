@@ -1,0 +1,20 @@
+Create table dbDataDwItau.itau.Estratificacao360 as (
+    Periodo varchar(32),
+    CodigoReferencia smallint,
+    Carteira varchar(64),
+    Produto varchar(64),
+    SubProduto varchar(64),
+    Cluster varchar(4),
+    Categoria varchar(100),
+    FaixaAtraso varchar(64),
+    FaixaValor varchar(64),
+    Base int,
+    ValorRegularizacao money,
+    ValorSaldoVencido money,
+    Entradas int,
+    BaseMailing int,
+    Trabalhado int,
+    Atendimenot int,
+    CPC int,
+    Acordo int
+)
