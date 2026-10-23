@@ -15,5 +15,8 @@ Create table dbDataDwItau.itau.Discador360 (
 	DuracaoChamada float,
 	DuracaoFalado float,
 	DuracaoTabulando float,
-	Chave varchar(256)
+	Chave varchar(256),
+	Atendimento int,
+	CPC int,
+	Acordo int
 );
