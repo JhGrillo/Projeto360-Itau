@@ -1,0 +1,22 @@
+Create Table dbDataDwItau.itau.QuartilDia360 (
+	Data datetime,
+	CodigoReferencia int,
+	Carteira varchar(64),
+	DiaUtil int,
+	SubProduto varchar(64),
+	Cluster varchar(32),
+	Referencia varchar(64),
+	Nome varchar(150),
+	Coordenador varchar(64),
+	Supervisor varchar(64),
+	ValorCaixa money,
+	ValorRegularizacao money,
+	MetaCaixa money,
+	MetaRegularizacao money,
+	ICMCaixa float,
+	ICMRegularizacao float,
+	ValorCaixaProjetado money,
+	ValorRegularizacaoProjetado money,
+	IcmProjetadoCaixa float,
+	IcmProjetadoRegularizacao float
+);
