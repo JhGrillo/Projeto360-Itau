@@ -1,4 +1,4 @@
-Create or Alter procedure [itau].[ProcEstratificacao360] as
+Create or Alter procedure itau.ProcEstratificacao360 as
 
 ------------------------------> Descrição da procedure
 
@@ -7,7 +7,7 @@ Create or Alter procedure [itau].[ProcEstratificacao360] as
     Nome: ProcEstratificacao360
     DataCriação: 13/10/2026
     Criado por: João Henrique Cavalheiro Grillo
-    DataAtualização: 20/10/2026
+    DataAtualização: 26/10/2026
     Atualizado por: João Henrique Cavalheiro Grillo  
 
     Descrição atualização: (Data, Atualizado por, Descrição, git)
@@ -15,6 +15,8 @@ Create or Alter procedure [itau].[ProcEstratificacao360] as
 	os indicadores abertos em uma janela de 30, 60 e 90 dias.
 
 	20/10/2026 João Henrique Cavalheiro Grillo: Incluido o campo de categoria.
+
+	26/10/2026 João Henrique Cavalheiro Grillo: Incluido segmentação de acordo direto e indireto.
 
 */
 
@@ -39,7 +41,7 @@ Declare @NomeProcedure varchar(128) = 'ProcEstratificacao360',
 		@Data60Dias date,
 		@Data90Dias date;
 
---/* Inicia o controle de logs */
+/* Inicia o controle de logs */
 Exec dbDataDwItau.[log].ProcControles
     @TipoLog = 'Execucao',
     @NomeProcedure = @NomeProcedure,
@@ -73,7 +75,9 @@ If Object_id('Tempdb..#BaseAtiva') Is not null Drop table #BaseAtiva;Create tabl
 	Trabalhado int,
 	Atendimento int,
 	CPC int,
-	Acordo int
+	Acordo int,
+	AcordoDireto int,
+	AcordoIndireto int
 );
 
 --- | Base unificada
@@ -97,7 +101,9 @@ Create table #BaseUnificada (
 	Trabalhado int,
 	Atendimento int,
 	CPC int,
-	Acordo int
+	Acordo int,
+	AcordoDireto int,
+	AcordoIndireto int
 );
 
 ------------------------------> Insere dados em tabelas
@@ -167,8 +173,10 @@ CRMAgregado as (
 		'01. 30 Dias' as Periodo, 
 		1 as Atendimento, 
 		Max(CPC) as CPC, 
-		MAX(Acordo) as Acordo 
-	From dbDataDwItau.itau.CRM360 With(nolock)
+		Max(Acordo) as Acordo,
+		Max(Case when Referencia <> '000000' then Acordo end) as AcordoDireto,
+		Max(Case when Referencia = '000000' then Acordo end) as AcordoIndireto
+	From dbDataDwItau.itau.CRM360 With(nolock) 
 	Where
 		Data >= @Data30Dias 
 	Group by
@@ -183,7 +191,9 @@ CRMAgregado as (
 		'02. 60 Dias' as Periodo, 
 		1 AS Atendimento, 
 		Max(CPC) AS CPC, 
-		Max(Acordo) AS Acordo 
+		Max(Acordo) as Acordo,
+		Max(Case when Referencia <> '000000' then Acordo end) as AcordoDireto,
+		Max(Case when Referencia = '000000' then Acordo end) as AcordoIndireto
 	From dbDataDwItau.itau.CRM360 With(nolock)
 	Where
 		Data >= @Data60Dias 
@@ -199,7 +209,9 @@ CRMAgregado as (
 		'03. 90 Dias' as Periodo, 
 		1 AS Atendimento, 
 		Max(CPC) as CPC, 
-		Max(Acordo) as Acordo 
+		Max(Acordo) as Acordo,
+		Max(Case when Referencia <> '000000' then Acordo end) as AcordoDireto,
+		Max(Case when Referencia = '000000' then Acordo end) as AcordoIndireto
 	From dbDataDwItau.itau.CRM360 With(nolock) 
 	Where
 		Data >= @Data90Dias 
@@ -228,7 +240,9 @@ Insert into #BaseAtiva (
 	Trabalhado, 
 	Atendimento, 
 	CPC, 
-	Acordo
+	Acordo,
+	AcordoDireto,
+	AcordoIndireto
 )
 Select
 	P.Periodo,
@@ -250,7 +264,9 @@ Select
 	Case when b.IdDevedor is not null or c.IdDevedor is not null then 1 end,
 	c.Atendimento,
 	c.CPC,
-	c.Acordo
+	c.Acordo,
+	c.AcordoDireto,
+	c.AcordoIndireto
 From BasePrincipal a
 Cross Apply (
     Values 
@@ -288,7 +304,9 @@ Select
 	Max(Trabalhado),
 	Max(Atendimento),
 	Max(CPC),
-	Max(Acordo)
+	Max(Acordo),
+	Max(AcordoDireto) as AcordoDireto,
+	Max(AcordoIndireto) as AcordoIndireto
 From #BaseAtiva
 Group by
 	Periodo,
@@ -324,7 +342,9 @@ Insert into dbDataDwItau.itau.Estratificacao360 (
 												Trabalhado,
 												Atendimento,
 												CPC,
-												Acordo
+												Acordo,
+												AcordoDireto,
+												AcordoIndireto
 											)
 Select
 	Periodo,
@@ -344,7 +364,9 @@ Select
 	Sum(Trabalhado) as Trabalhado,
 	Sum(Atendimento) as Atendimento,
 	Sum(CPC) as CPC,
-	Sum(Acordo) as Acordo
+	Sum(Acordo) as Acordo,
+	Sum(AcordoDireto) as AcordoDireto,
+	Sum(AcordoIndireto) as AcordoIndireto
 From #BaseUnificada
 Group by
 	Periodo,

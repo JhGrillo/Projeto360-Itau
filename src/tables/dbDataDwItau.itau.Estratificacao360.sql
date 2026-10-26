@@ -16,5 +16,7 @@ Create table dbDataDwItau.itau.Estratificacao360 as (
     Trabalhado int,
     Atendimenot int,
     CPC int,
-    Acordo int
+    Acordo int,
+    AcordoDireto int,
+    AcordoIndireto int
 )
